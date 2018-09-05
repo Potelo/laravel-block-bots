@@ -1,0 +1,31 @@
+{
+    "name": "potelo/laravel-block-bots",
+    "description": "Block bots and high traffic offenders using Redis",
+    "authors": [
+        {
+            "name": "Bruno Cabral",
+            "email": "bruno@potelo.com.br"
+        }
+    ],
+    "require": {
+      "illuminate/support": "^5.5",
+      "predis/predis": "^1.1",
+      "php" : "^7.0"
+    },
+
+    "minimum-stability": "dev",
+
+    "autoload": {
+      "psr-4": {
+        "Potelo\\LaravelBlockBots\\": "src"
+      }
+    },
+
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Potelo\\LaravelBlockBots\\BlockBotsServiceProvider"
+            ]
+        }
+    }
+}
