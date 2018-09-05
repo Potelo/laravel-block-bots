@@ -8,7 +8,6 @@ return [
      */
 
     'enabled' => env('BLOCK_BOTS_ENABLED', true),
-
     /*
      * Whitelisted  IP addresses
      *      '127.0.0.1',
@@ -20,7 +19,7 @@ return [
     ],
 
     'allow_logged_user' => env('BLOCK_BOTS_ALLOW_LOGGED_USER', true),
-    'fake_mode' => env('BLOCK_BOTS_FAKE_MODE', true), // minutes - disabled by default
+    'fake_mode' => env('BLOCK_BOTS_FAKE_MODE', true), //
 
     /*
      * Send suspicious events to log?

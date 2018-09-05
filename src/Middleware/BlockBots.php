@@ -11,13 +11,18 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Potelo\LaravelBlockBots\CheckIfBotIsReal;
 
-class BlockBots extends Middleware
+class BlockBots
 {
     protected $config;
 
     public function __construct()
     {
         $this->config = config('block');
+    }
+
+    private function enabled()
+    {
+        return $this->config['enabled'];
     }
 
     /**
@@ -154,7 +159,7 @@ class BlockBots extends Middleware
                 return true;
 
             // If we got here, it is an unverified bot. Lets create a job to test it
-            \Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal::dispatchNow($ip, $user_agent);
+            \Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal::dispatch($ip, $user_agent);
 
         }
 

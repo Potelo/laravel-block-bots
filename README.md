@@ -1,88 +1,91 @@
-# Project Title
+# Laravel Block Bots
 
-One Paragraph of project description goes here
 
-## Getting Started
+[![Latest Version on Packagist][ico-version]][link-packagist]
+[![Software License][ico-license]](LICENSE.md)
+[![Total Downloads][ico-downloads]][link-downloads]
 
-These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
-### Prerequisites
+## Introduction
+Laravel Block bots is a pacakge that block bad crawlers, people trying to scrape your website or high-usage users, but lets good and important crawlers such as GoogleBot and Bing pass-thu. 
 
-What things you need to install the software and how to install them
 
+## Features
+- ULTRA fast, less than 1ms increase in each request.
+- Verify Crawlers using reverse DNS
+- Highly configurable
+- Redirect users to a page when they got blocked
+- Allow Logged users to always bypass blocks
+
+
+
+## Install
+
+Via Composer
+``` bash
+composer require potelo/laravel-block-bots
 ```
-Give examples
+#### Requirement
+- This package rely on heavly on Redis. To use it, make sure that Redis is configured and ready. (see [Laravel Redis Configuration](https://laravel.com/docs/5.6/redis#configuration))
+
+
+#### Before Laravel 5.5
+In Laravel 5.4. you'll manually need to register the `\Potelo\LaravelBlockBots\BlockBots::class` service provider in `config/app.php`.
+
+#### Config
+To adjust the library, you can publish the config file to your project using:
 ```
-
-### Installing
-
-A step by step series of examples that tell you how to get a development env running
-
-Say what the step will be
-
-```
-Give the example
-```
-
-And repeat
-
-```
-until finished
-```
-
-End with an example of getting some data out of the system or using it for a little demo
-
-## Running the tests
-
-Explain how to run the automated tests for this system
-
-### Break down into end to end tests
-
-Explain what these tests test and why
-
-```
-Give an example
+php artisan vendor:publish --provider="\Potelo\LaravelBlockBots\BlockBotsServiceProvider"
 ```
 
-### And coding style tests
+## Usage
 
-Explain what these tests test and why
+It's simple. Go to `Kernel.php` and add to the `$routeMiddleware` block as : 
+```
+protected $routeMiddleware = [
+        ...
+        'block' => \Potelo\LaravelBlockBots\BlockBots::class,
+    ];
+```
+
+Than you can put in the desired groups. For exemple, lets set to the Wrb group:
 
 ```
-Give an example
+
+ protected $middlewareGroups = [
+        'web' => [
+            ...
+            \App\Http\Middleware\VerifyCsrfToken::class,
+            'block:100,/limit'
+        ],
 ```
 
-## Deployment
+Where:
+- **100**: is the number of pages an IP can access every day
+- **/limit**: Is the route we going to redirect the IP after the limit
 
-Add additional notes about how to deploy this on a live system
 
-## Built With
+## Change log
 
-* [Dropwizard](http://www.dropwizard.io/1.0.2/docs/) - The web framework used
-* [Maven](https://maven.apache.org/) - Dependency Management
-* [ROME](https://rometools.github.io/rome/) - Used to generate RSS Feeds
+Please see [CHANGELOG](CHANGELOG.md) for more information on what has changed recently.
+
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](https://gist.github.com/PurpleBooth/b24679402957c63ec426) for details on our code of conduct, and the process for submitting pull requests to us.
+Please see [CONTRIBUTING](CONTRIBUTING.md) and [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md) for details.
 
-## Versioning
+## Credits
 
-We use [SemVer](http://semver.org/) for versioning. For the versions available, see the [tags on this repository](https://github.com/your/project/tags). 
-
-## Authors
-
-* **Billie Thompson** - *Initial work* - [PurpleBooth](https://github.com/PurpleBooth)
-
-See also the list of [contributors](https://github.com/your/project/contributors) who participated in this project.
+- [Potelo][link-author]
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details
+The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
 
-## Acknowledgments
+[ico-version]: https://img.shields.io/packagist/v/potelo/laravel-block-bots.svg?style=flat-square
+[ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
+[ico-downloads]: https://img.shields.io/packagist/dt/potelo/laravel-block-bots.svg?style=flat-square
 
-* Hat tip to anyone whose code was used
-* Inspiration
-* etc
-
+[link-packagist]: https://packagist.org/packages/potelo/laravel-block-bots
+[link-downloads]: https://packagist.org/packages/potelo/laravel-block-bots
+[link-author]: https://github.com/potelo
