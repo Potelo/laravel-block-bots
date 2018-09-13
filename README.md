@@ -35,7 +35,7 @@ In Laravel 5.4. you'll manually need to register the `\Potelo\LaravelBlockBots\B
 #### Config
 To adjust the library, you can publish the config file to your project using:
 ```
-php artisan vendor:publish --provider="\Potelo\LaravelBlockBots\BlockBotsServiceProvider"
+php artisan vendor:publish --provider="Potelo\LaravelBlockBots\BlockBotsServiceProvider"
 ```
 
 ## Usage
