@@ -1,6 +1,6 @@
 <?php
 
-namespace Potelo\LaravelBlockBots;
+namespace Potelo\LaravelBlockBots\Middleware;
 
 use Closure;
 use Illuminate\Support\Facades\Redirect;
@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 use Carbon\Carbon;
 use Potelo\LaravelBlockBots\CheckIfBotIsReal;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class BlockBots
 {
@@ -17,12 +18,7 @@ class BlockBots
 
     public function __construct()
     {
-        $this->config = config('block');
-    }
-
-    private function enabled()
-    {
-        return $this->config['enabled'];
+        $this->config = config('block-bots');
     }
 
     /**
@@ -33,22 +29,21 @@ class BlockBots
      *
      * @return mixed
      */
-    public function handle($request, Closure $next, $dailyLimit, $redirectUrl)
+    public function handle($request, Closure $next, $dailyLimit)
     {
+        try {
+            $blocked = $this->blocked($request, $dailyLimit);
 
-        if ($this->enabled() && ($request->getRequestUri() != $redirectUrl)) {
+        } catch (Exception $e) {
+            Log::error("[Block-Bots] Error at handling request: {$e->getMessage()}");
+            $blocked = false;
+        }
 
-            try {
-                $blocked = $this->blocked($request, $dailyLimit);
-
-            } catch (Exception $e) {
-                Log::error("[Block-Bots] Error at handling request: {$e->getMessage()}");
-                $blocked = false;
+        if ($blocked) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => 'You are over the specified limit.'], 403);
             }
-
-            if ($blocked) {
-                return Redirect::to($redirectUrl);
-            }
+            return response(view('block-bots::error'), 403);
         }
 
         return $next($request);
@@ -160,6 +155,9 @@ class BlockBots
 
             // If we got here, it is an unverified bot. Lets create a job to test it
             \Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal::dispatch($ip, $user_agent);
+            Redis::sadd($key_pending_bot, $ip);
+            return true;
+
 
         }
 

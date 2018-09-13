@@ -14,8 +14,14 @@ class BlockBotsServiceProvider extends ServiceProvider
     public function boot()
     {
         $this->publishes([
-            __DIR__ . '/config/config.php' => config_path('config.php'),
-        ], 'config');
+            __DIR__ . '/config/block-bots.php' => config_path('block-bots.php'),
+        ]);
+
+        $this->loadViewsFrom(__DIR__.'/views', 'block-bots');
+
+        $this->publishes([
+            __DIR__.'/views' => resource_path('views/vendor/block-bots'),
+        ]);
     }
 
     /**
@@ -26,7 +32,7 @@ class BlockBotsServiceProvider extends ServiceProvider
     public function register()
     {
         $this->mergeConfigFrom(
-            __DIR__.'/config/config.php', 'block'
+            __DIR__.'/config/block-bots.php', 'block-bots'
         );
     }
 }

@@ -15,7 +15,10 @@ class CheckIfBotIsReal implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     protected $ip;
+
     protected $user_agent;
+
+    protected $config;
 
 
     /**
@@ -28,7 +31,7 @@ class CheckIfBotIsReal implements ShouldQueue
     {
         $this->ip = $ip;
         $this->user_agent = $user_agent;
-        $this->config = config('block');
+        $this->config = config('block-bots');
     }
 
     /**
