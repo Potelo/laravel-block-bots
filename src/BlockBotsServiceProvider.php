@@ -3,6 +3,8 @@
 namespace Potelo\LaravelBlockBots;
 
 use Illuminate\Support\ServiceProvider;
+use Potelo\LaravelBlockBots\Commands\ListWhitelist;
+use Potelo\LaravelBlockBots\Commands\ClearWhitelist;
 
 class BlockBotsServiceProvider extends ServiceProvider
 {
@@ -13,6 +15,14 @@ class BlockBotsServiceProvider extends ServiceProvider
      */
     public function boot()
     {
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                ListWhitelist::class,
+                ClearWhitelist::class,
+            ]);
+        }
+
         $this->publishes([
             __DIR__ . '/config/block-bots.php' => config_path('block-bots.php'),
         ]);
@@ -36,3 +46,5 @@ class BlockBotsServiceProvider extends ServiceProvider
         );
     }
 }
+
+
