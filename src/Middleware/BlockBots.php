@@ -31,6 +31,11 @@ class BlockBots
      */
     public function handle($request, Closure $next, $dailyLimit)
     {
+        $enabled = $this->config['fake_mode'];
+        if (!$enabled){
+            return $next($request);
+        }
+
         try {
             $blocked = $this->blocked($request, $dailyLimit);
 

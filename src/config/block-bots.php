@@ -34,8 +34,6 @@ return [
      *
      */
     'allowed_crawlers' => [
-
-        'firefox' => 'firefox',
         'ahrefs' => 'ahrefs',
         'alexa' => 'alexa',
         'ask' => 'ask',
@@ -43,15 +41,15 @@ return [
         'bing' => 'msn.com',
         'duckduck' => '*',
         'exabot' => 'exabot',
-        'facebook' => 'baidu',
+        'facebook' => 'facebook',
         'google' => 'google',
-        'msn' => 'google',
+        'msn' => 'msn',
         'msnbot' => 'msn.com',
         'sogou' => 'sogou',
         'soso' => 'soso',
         'twitter' => 'twitter',
         'yahoo' => 'yahoo',
-        'yandex' => 'baidu',
+        'yandex' => 'yandex',
     ],
 ];
 
