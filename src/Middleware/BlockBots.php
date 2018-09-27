@@ -31,7 +31,7 @@ class BlockBots
      */
     public function handle($request, Closure $next, $dailyLimit)
     {
-        $enabled = $this->config['fake_mode'];
+        $enabled = $this->config['enabled'];
         if (!$enabled){
             return $next($request);
         }
@@ -40,7 +40,7 @@ class BlockBots
             $blocked = $this->blocked($request, $dailyLimit);
 
         } catch (Exception $e) {
-            Log::error("[Block-Bots] Error at handling request: {$e->getMessage()}");
+            Log::stack($this->config['channels_info'])->error("[Block-Bots] Error at handling request: {$e->getMessage()}");
             $blocked = false;
         }
 
@@ -62,6 +62,7 @@ class BlockBots
     public function blocked($request, $dailyLimit)
     {
 
+        $dailyLimit = (int) $dailyLimit;
         $ip = $request->getClientIp();
         $user_agent = $request->header('User-Agent');
         $fake_mode = $this->config['fake_mode'];
@@ -94,12 +95,19 @@ class BlockBots
             return false;
         }
         else{
-            if($fake_mode)
-            {
                 if ($log_blocked_requests){
-                    Log::error("[Block-Bots] IP: {$ip} with User agent: {$user_agent} would be blocked after {$number_of_hits} hits while accessing URL {$full_url}");
+                $key_notified = "block_bot:notified:{$ip}";
+                if(!Redis::exists($key_notified))
+                {
+                    $end_of_day_unix_timestamp = Carbon::tomorrow()->startOfDay()->timestamp;
+                    Redis::set($key_notified, 1);
+                    Redis::expireat($key_notified, $end_of_day_unix_timestamp);
+                    Log::stack($this->config['channels_blocks'])->error("[Block-Bots] IP: {$ip} with User agent: {$user_agent} would be blocked after {$number_of_hits} hits while accessing URL {$full_url}");
+                }
                 }
 
+            if($fake_mode)
+            {
                 return false;
             }
             else{
@@ -142,7 +150,7 @@ class BlockBots
             //Add this to the redis list as it is faster
             Redis::sadd($key_whitelist, $ip);
             if ($this->config['log_blocked_requests']){
-                Log::info("[Block-Bots] WHITELISTED IP: {$ip} with User agent: {$user_agent} because was on our config");
+                Log::stack($this->config['channels_info'])->info("[Block-Bots] WHITELISTED IP: {$ip} with User agent: {$user_agent} because was on our config");
             }
         }
 

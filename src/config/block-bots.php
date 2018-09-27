@@ -23,6 +23,20 @@ return [
     'fake_mode' => env('BLOCK_BOTS_FAKE_MODE', true), // minutes - disabled by default
 
     /*
+     * Log channel
+     */
+    'channels_info' => [
+        'single'
+    ],
+
+    /*
+     * This Log channel will receive when a bad crawler is detected or someone is banned
+     */
+    'channels_blocks' => [
+        'single'
+    ],
+
+    /*
      * Send suspicious events to log?
      *
      */

@@ -71,7 +71,7 @@ class CheckIfBotIsReal implements ShouldQueue
             Redis::sadd($key_whitelist, $ip);
 
             if ($log_blocked_requests){
-                Log::info("[Block-Bots] IP: {$ip} with User agent: {$user_agent} was detected as a GOOD crawler");
+                Log::stack($this->config['channels_info'])->info("[Block-Bots] IP: {$ip} with User agent: {$user_agent} was detected as a GOOD crawler");
             }
 
         }
@@ -80,7 +80,7 @@ class CheckIfBotIsReal implements ShouldQueue
             Redis::sadd($key_fake_bot, $ip);
 
             if ($log_blocked_requests){
-                Log::info("[Block-Bots] IP: {$ip} with User agent: {$user_agent} was detected as a BAD crawler");
+                Log::stack($this->config['channels_info'])->info("[Block-Bots] IP: {$ip} with User agent: {$user_agent} was detected as a BAD crawler");
             }
         }
 
