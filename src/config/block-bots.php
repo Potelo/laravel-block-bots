@@ -9,6 +9,10 @@ return [
 
     'enabled' => env('BLOCK_BOTS_ENABLED', true),
 
+    'ip_info_key' => env('BLOCK_BOTS_IP_INFO_KEY', null),
+
+
+
     /*
      * Whitelisted  IP addresses
      *      '127.0.0.1',

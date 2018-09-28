@@ -3,14 +3,14 @@
 namespace Potelo\LaravelBlockBots\Middleware;
 
 use Closure;
-use Illuminate\Support\Facades\Redirect;
+
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
 use Carbon\Carbon;
 use Potelo\LaravelBlockBots\CheckIfBotIsReal;
-use Symfony\Component\HttpKernel\Exception\HttpException;
+
 
 class BlockBots
 {
@@ -46,9 +46,9 @@ class BlockBots
 
         if ($blocked) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'You are over the specified limit.'], 403);
+                return response()->json(['message' => 'You are over the specified limit.'], 429);
             }
-            return response(view('block-bots::error'), 403);
+            return response(view('block-bots::error'), 429);
         }
 
         return $next($request);
@@ -102,7 +102,8 @@ class BlockBots
                     $end_of_day_unix_timestamp = Carbon::tomorrow()->startOfDay()->timestamp;
                     Redis::set($key_notified, 1);
                     Redis::expireat($key_notified, $end_of_day_unix_timestamp);
-                    Log::stack($this->config['channels_blocks'])->error("[Block-Bots] IP: {$ip} with User agent: {$user_agent} would be blocked after {$number_of_hits} hits while accessing URL {$full_url}");
+                    \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'BLOCKED', $full_url);
+
                 }
                 }
 
@@ -150,7 +151,7 @@ class BlockBots
             //Add this to the redis list as it is faster
             Redis::sadd($key_whitelist, $ip);
             if ($this->config['log_blocked_requests']){
-                Log::stack($this->config['channels_info'])->info("[Block-Bots] WHITELISTED IP: {$ip} with User agent: {$user_agent} because was on our config");
+                \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'WHITELISTED');
             }
         }
 
