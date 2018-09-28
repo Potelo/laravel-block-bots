@@ -48,7 +48,7 @@ class ProcessLogWithIpInfo implements ShouldQueue
         $user_agent = $this->user_agent;
         $ip = $this->ip;
         $key_access_count = "block_bot:{$ip}";
-        $number_of_requests = Redis::exists($key_access_count);
+        $number_of_requests = Redis::get($key_access_count);
 
         $host = strtolower(gethostbyaddr($ip));
         $messsage = "[Block-Bots] IP: {$ip}; After {$number_of_requests} requests , Host:{$host} \n  with User agent: {$user_agent};  was {$this->action}";
