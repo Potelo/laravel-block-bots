@@ -37,6 +37,13 @@ To adjust the library, you can publish the config file to your project using:
 ```
 php artisan vendor:publish --provider="Potelo\LaravelBlockBots\BlockBotsServiceProvider"
 ```
+Configure variables in your .env file:
+```
+BLOCK_BOTS_ENABLED=false
+BLOCK_BOTS_ALLOW_LOGGED_USER=true
+BLOCK_BOTS_FAKE_MODE=false
+BLOCK_BOTS_LOG_BLOCKED_REQUESTS=true
+```
 
 ## Usage
 
