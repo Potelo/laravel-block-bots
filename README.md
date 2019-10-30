@@ -51,7 +51,7 @@ It's simple. Go to `Kernel.php` and add to the `$routeMiddleware` block as :
 ```
 protected $routeMiddleware = [
         ...
-        'block' => \Potelo\LaravelBlockBots\BlockBots::class,
+        'block' => \Potelo\LaravelBlockBots\Middleware\BlockBots::class,
     ];
 ```
 
