@@ -69,5 +69,12 @@ return [
         'yahoo' => 'yahoo',
         'yandex' => 'yandex',
     ],
+
+    /*
+     * Default json response when blocked
+     */
+    'json_response' => [
+        'message' => 'Você está acima do limite.'
+    ],
 ];
 
