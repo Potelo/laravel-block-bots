@@ -46,7 +46,7 @@ class BlockBots
 
         if ($blocked) {
             if ($request->expectsJson()) {
-                return response()->json(['message' => 'You are over the specified limit.'], 429);
+                return response()->json($this->config['json_response'], 429);
             }
             return response(view('block-bots::error'), 429);
         }
