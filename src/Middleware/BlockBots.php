@@ -72,7 +72,8 @@ class BlockBots
 
         $full_url = substr($request->fullUrl(), strlen($request->getScheme(). "://")); # Get the URL without scheme
 
-        $key_access_count = "block_bot:{$ip}";
+        $key_identifier = Auth::check() ? Auth::id() : $ip;
+        $key_access_count = "block_bot:{$key_identifier}";
 
         $number_of_hits = 1;
 
@@ -96,23 +97,22 @@ class BlockBots
             return false;
         }
         else{
-            if ($log_blocked_requests) {
+            if ($log_blocked_requests){
                 $key_notified = "block_bot:notified:{$ip}";
-
                 if (!Redis::exists($key_notified)) {
                     $end_of_day_unix_timestamp = Carbon::tomorrow()->startOfDay()->timestamp;
                     Redis::set($key_notified, 1);
                     Redis::expireat($key_notified, $end_of_day_unix_timestamp);
-                    \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'BLOCKED', $full_url);
+                    if (Auth::guest()) {
+                        \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'BLOCKED', $full_url);
+                    }
                 }
             }
 
-            if($fake_mode)
-            {
+            if ($fake_mode) {
                 return false;
-            }
-            else{
-                event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::today()));
+            } else {
+                event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::now()));
                 return true;
             }
         }
