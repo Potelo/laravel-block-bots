@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 
 use Carbon\Carbon;
 use Potelo\LaravelBlockBots\CheckIfBotIsReal;
+use Potelo\LaravelBlockBots\Events\UserBlockedEvent;
 
 
 class BlockBots
@@ -95,23 +96,23 @@ class BlockBots
             return false;
         }
         else{
-                if ($log_blocked_requests){
+            if ($log_blocked_requests) {
                 $key_notified = "block_bot:notified:{$ip}";
-                if(!Redis::exists($key_notified))
-                {
+
+                if (!Redis::exists($key_notified)) {
                     $end_of_day_unix_timestamp = Carbon::tomorrow()->startOfDay()->timestamp;
                     Redis::set($key_notified, 1);
                     Redis::expireat($key_notified, $end_of_day_unix_timestamp);
                     \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'BLOCKED', $full_url);
-
                 }
-                }
+            }
 
             if($fake_mode)
             {
                 return false;
             }
             else{
+                event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::today()));
                 return true;
             }
         }
