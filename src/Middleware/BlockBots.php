@@ -112,7 +112,9 @@ class BlockBots
             if ($fake_mode) {
                 return false;
             } else {
-                event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::now()));
+                if (Auth::check()) {
+                    event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::now()));
+                }
                 return true;
             }
         }
