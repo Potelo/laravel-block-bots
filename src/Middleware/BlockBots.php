@@ -112,7 +112,7 @@ class BlockBots
             if ($fake_mode) {
                 return false;
             } else {
-                if (Auth::check()) {
+                if (Auth::check() && $number_of_hits == $dailyLimit + 1) {
                     event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::now()));
                 }
                 return true;
