@@ -29,6 +29,8 @@ class BlockBots extends AbstractBlockBots
      */
     public function handle($request, Closure $next, $limit = 100, $frequency = 'daily')
     {
+        $this->beforeHandle();
+
         if (!$this->options->enabled) {
             return $next($request);
         }
@@ -73,12 +75,12 @@ class BlockBots extends AbstractBlockBots
             return true;
         } elseif ($this->options->mode === 'always') {
             return false;
-        } elseif (!$this->isLimitExceeded()) {
-            if (Auth::check()) {
-                return $this->passesAuthRules();
-            }
-            return $this->passesGuestRules();
+        } elseif (Auth::check()) {
+            return $this->passesAuthRules() && !$this->isLimitExceeded();
+        } elseif (Auth::guest()) {
+            return $this->passesGuestRules() && !$this->isLimitExceeded();
         }
+
         return $this->passesBotRules();
     }
 
