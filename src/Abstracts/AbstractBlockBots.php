@@ -6,7 +6,7 @@ use Potelo\LaravelBlockBots\Contracts\Configuration;
 use Potelo\LaravelBlockBots\Contracts\Client;
 use Carbon\Carbon;
 
-class AbstractBlockBots
+abstract class AbstractBlockBots
 {
     private $allowedBots = [];
     protected $request;
@@ -83,4 +83,10 @@ class AbstractBlockBots
     {
         return $this->hits === $this->limit + 1;
     }
+
+    abstract protected function countHits();
+
+    abstract protected function isAllowed();
+
+    abstract protected function notAllowed();
 }
