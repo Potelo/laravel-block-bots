@@ -4,182 +4,210 @@ namespace Potelo\LaravelBlockBots\Middleware;
 
 use Closure;
 
+use Carbon\Carbon;
+
 use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 
-use Carbon\Carbon;
-use Potelo\LaravelBlockBots\CheckIfBotIsReal;
+use Potelo\LaravelBlockBots\Abstracts\AbstractBlockBots;
 use Potelo\LaravelBlockBots\Events\UserBlockedEvent;
+use Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal;
+use Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo;
 
 
-class BlockBots
+class BlockBots extends AbstractBlockBots
 {
-    protected $config;
-
-    public function __construct()
-    {
-        $this->config = config('block-bots');
-    }
 
     /**
-     * Register all visits in Redis
+     * Executes the middleware
      *
-     * @param \Illuminate\Http\Request $request
-     * @param \Closure                 $next
-     *
-     * @return mixed
+     * @param Request $request
+     * @param Closure $next
+     * @param int $limit
+     * @param string $frequency
+     * @return void
      */
-    public function handle($request, Closure $next, $dailyLimit)
+    public function handle($request, Closure $next, $limit = 100, $frequency = 'daily')
     {
-        $enabled = $this->config['enabled'];
-        if (!$enabled){
+        if (!$this->options->enabled) {
             return $next($request);
         }
 
-        try {
-            $blocked = $this->blocked($request, $dailyLimit);
+        $this->setUp($request, $limit, $frequency);
+        $this->countHits();
 
-        } catch (Exception $e) {
-            Log::stack($this->config['channels_info'])->error("[Block-Bots] Error at handling request: {$e->getMessage()}");
-            $blocked = false;
-        }
-
-        if ($blocked) {
-            if ($request->expectsJson()) {
-                return response()->json($this->config['json_response'], 429);
-            }
-            return response(view('block-bots::error'), 429);
-        }
-
-        return $next($request);
+        return $this->isAllowed() ? $next($this->request) : $this->notAllowed();
     }
 
     /**
-     * Check if user is blocked
+     * Responses to disallowed client
      *
-     * @return mixed
+     * @return response
      */
-    public function blocked($request, $dailyLimit)
+    protected function notAllowed()
     {
-
-        $dailyLimit = (int) $dailyLimit;
-        $ip = $request->getClientIp();
-        $user_agent = $request->header('User-Agent');
-        $fake_mode = $this->config['fake_mode'];
-        $log_blocked_requests = $this->config['log_blocked_requests'];
-        $allow_logged_user = $this->config['allow_logged_user'];
-
-        $full_url = substr($request->fullUrl(), strlen($request->getScheme(). "://")); # Get the URL without scheme
-
-        $key_identifier = Auth::check() ? Auth::id() : $ip;
-        $key_access_count = "block_bot:{$key_identifier}";
-
-        $number_of_hits = 1;
-
-        // Lets get the total count, or create a new key for him
-        if(!Redis::exists($key_access_count))
-        {
-            $end_of_day_unix_timestamp = Carbon::tomorrow()->startOfDay()->timestamp;
-            Redis::set($key_access_count, 1);
-            Redis::expireat($key_access_count, $end_of_day_unix_timestamp);
-        }
-        else{
-            $number_of_hits = Redis::incr($key_access_count);
+        if ($this->options->log) {
+            $this->logDisallowance();
         }
 
-        $over_the_limit = $number_of_hits > $dailyLimit;
-        $is_user_logged = $allow_logged_user && Auth::check();
+        if (Auth::check() && $this->isTheFirstOverflow()) {
+            event(new UserBlockedEvent(Auth::user(), $this->hits, Carbon::now()));
+        }
 
 
-        if(!$over_the_limit || $is_user_logged || $this->isWhitelisted($ip, $user_agent))
-        {
+        if ($this->request->expectsJson()) {
+            return response()->json($this->options->json_response, 429);
+        }
+
+        return response(view('block-bots::error'), 429);
+    }
+
+    /**
+     * Check if the client access is allowed
+     *
+     * @return boolean
+     */
+    protected function isAllowed()
+    {
+        if ($this->options->mode === 'never') {
+            return true;
+        } elseif ($this->options->mode === 'always') {
             return false;
+        } elseif (!$this->isLimitExceeded()) {
+            if (Auth::check()) {
+                return $this->passesAuthRules();
+            }
+            return $this->passesGuestRules();
         }
-        else{
-            if ($log_blocked_requests){
-                $key_notified = "block_bot:notified:{$ip}";
-                if (!Redis::exists($key_notified)) {
-                    $end_of_day_unix_timestamp = Carbon::tomorrow()->startOfDay()->timestamp;
-                    Redis::set($key_notified, 1);
-                    Redis::expireat($key_notified, $end_of_day_unix_timestamp);
-                    if (Auth::guest()) {
-                        \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'BLOCKED', $full_url);
-                    }
-                }
-            }
+        return $this->passesBotRules();
+    }
 
-            if ($fake_mode) {
-                return false;
-            } else {
-                if (Auth::check() && $number_of_hits == $dailyLimit + 1) {
-                    event(new UserBlockedEvent(Auth::user(), $number_of_hits, Carbon::now()));
-                }
-                return true;
-            }
+    /**
+     * Returns the value of the access counter
+     *
+     * @return void
+     */
+    protected function countHits()
+    {
+        if (!Redis::exists($this->client->key)) {
+            Redis::set($this->client->key, 1);
+            Redis::expireat($this->client->key, $this->timeOutAt);
+        }
+
+        return $this->hits = Redis::incr($this->client->key);
+    }
+
+    private function logDisallowance()
+    {
+        if (!Redis::exists($this->client->logKey)) {
+            Redis::set($this->client->logKey, 1);
+            Redis::expireat($this->client->logKey, $this->timeOutAt);
+
+            ProcessLogWithIpInfo::dispatch($this->client, "BLOCKED", $this->options);
         }
     }
 
-    private function isABot($user_agent)
+    /**
+     * Check if the client is a preseted allowed bot.
+     *
+     * @return boolean
+     */
+    private function isAllowedBot()
     {
-        $allowed_bots = array_keys($this->config['allowed_crawlers']);
-        $lower_user_agent = strtolower($user_agent);
-        $pattern = strtolower('('.implode('|',$allowed_bots).')');
+        $allowedBotsKeys = array_keys($this->getAllowedBots());
+        $userAgent = strtolower($this->client->userAgent);
+        $pattern = strtolower('(' . implode('|', $allowedBotsKeys) . ')');
 
-        if ( preg_match($pattern, $lower_user_agent)){
-            return true;
-        }else{
-            return false;
-        }
+        return preg_match($pattern, $userAgent);
     }
 
-    public function isWhitelisted($ip, $user_agent)
+    /**
+     * Check if the client is whitelisted.
+     *
+     * @return bool
+     */
+    private function isWhitelisted()
     {
-
-        $key_whitelist = "block_bot:whitelist";
-        $allowed = Redis::sismember($key_whitelist, $ip);
-        //We fast-track allowed IPs
-        if($allowed)
+        if (Redis::sismember($this->options->whitelist_key, $this->client->ip)) {
             return true;
-
-        //Lets block fake bots
-        $key_fake_bot = "block_bot:fake_bots";
-        $fake_bot = Redis::sismember($key_fake_bot, $ip);
-
-        if ($fake_bot)
-            return false;
+        }
 
         //Lets verify if its on our whitelist
-        if (in_array($ip, $this->config['whitelist_ips'])){
+        if (in_array($this->client->ip, $this->options->whitelist_ips)) {
             //Add this to the redis list as it is faster
-            Redis::sadd($key_whitelist, $ip);
-            if ($this->config['log_blocked_requests']){
-                \Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo::dispatch($ip, $user_agent, 'WHITELISTED');
-            }
-        }
-
-        // Or if is a allowed crawler
-        $is_a_bot = $this->isABot($user_agent);
-
-        if ($is_a_bot)
-        {
-            $key_pending_bot = "block_bot:pending_bots";
-            $pending_bot = Redis::sismember($key_pending_bot, $ip);
-            //Check if the verification is pending. While the check is not made, we allow this bot to pass-thru
-
-            if ($pending_bot)
-                return true;
-
-            // If we got here, it is an unverified bot. Lets create a job to test it
-            \Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal::dispatch($ip, $user_agent);
-            Redis::sadd($key_pending_bot, $ip);
+            Redis::sadd($this->options->whitelist_key, $this->client->ip);
+            ProcessLogWithIpInfo::dispatch($this->client, 'WHITELISTED', $this->options);
             return true;
-
-
         }
 
         return false;
-
     }
 
+
+    /**
+     * Determine if the request passes the auth check.
+     *
+     * @return bool
+     */
+    protected function passesAuthRules()
+    {
+        if (method_exists($this, 'authRules')) {
+            if (!call_user_func_array([$this, 'authRules'], [])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Determine if the request passes the guest check.
+     *
+     * @return bool
+     */
+    protected function passesGuestRules()
+    {
+        if (method_exists($this, 'guestRules')) {
+            if (!call_user_func_array([$this, 'guestRules'], [])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Determine if the request passes the bot check.
+     *
+     * @return bool
+     */
+    public function passesBotRules()
+    {
+        if (method_exists($this, 'botRules')) {
+            if (!call_user_func_array([$this, 'botRules'], [])) {
+                return false;
+            }
+        }
+        //We fast-track allowed IPs
+        if ($this->isWhitelisted()) {
+            return true;
+        }
+
+        //Lets block fake bots
+        if (Redis::sismember($this->options->fake_bot_list_key, $this->client->ip)) {
+            return false;
+        }
+
+        if ($this->isAllowedBot()) {
+            // While the bot is on pending_list, it's unchecked, so we allow this bot to pass-thru
+            if (!Redis::sismember($this->options->pending_bot_list_key, $this->client->ip)) {
+                // If we got here, it is an unknown bot. Let's create a job to test it
+                CheckIfBotIsReal::dispatch($this->client, $this->getAllowedBots());
+                Redis::sadd($this->options->pending_bot_list_key, $this->client->ip);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
 }

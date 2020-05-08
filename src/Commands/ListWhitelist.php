@@ -4,6 +4,7 @@ namespace Potelo\LaravelBlockBots\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
+use Potelo\LaravelBlockBots\Contracts\Configuration;
 
 class ListWhitelist extends Command
 {
@@ -29,6 +30,7 @@ class ListWhitelist extends Command
     public function __construct()
     {
         parent::__construct();
+        $this->options = new Configuration();
     }
 
     /**
@@ -38,14 +40,11 @@ class ListWhitelist extends Command
      */
     public function handle()
     {
-        //
-        $key_whitelist = "block_bot:whitelist";
-        $whitelist = Redis::smembers($key_whitelist);
+        $whitelist = Redis::smembers($this->options->whitelist_key);
+
         $this->info("List of IPs whitelisted:");
-        foreach ($whitelist as $ip)
-        {
+        foreach ($whitelist as $ip) {
             $this->info($ip);
         }
-
     }
 }

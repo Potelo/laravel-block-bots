@@ -2,7 +2,7 @@
 
 namespace Potelo\LaravelBlockBots\Jobs;
 
-use GuzzleHttp\Client;
+use GuzzleHttp\Client as HTTP;
 use Illuminate\Bus\Queueable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,11 +15,9 @@ class ProcessLogWithIpInfo implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    protected $ip;
-    protected $user_agent;
-    protected $config;
-    protected $attemped_url;
     protected $action;
+    protected $client;
+    protected $options;
 
 
     /**
@@ -28,13 +26,11 @@ class ProcessLogWithIpInfo implements ShouldQueue
      * @param $ip the IP address to check
      * @return bool true if the given IP address belongs to any of the valid hosts, otherwise false
      */
-    public function __construct($ip, $user_agent, $action, $attemped_url=null)
+    public function __construct($client, $action, $options = null)
     {
-        $this->ip = $ip;
-        $this->user_agent = $user_agent;
-        $this->attemped_url = $attemped_url;
         $this->action = $action;
-        $this->config = config('block-bots');
+        $this->client = $client;
+        $this->options = $options;
     }
 
     /**
@@ -44,32 +40,28 @@ class ProcessLogWithIpInfo implements ShouldQueue
      */
     public function handle()
     {
-        //
-        $user_agent = $this->user_agent;
-        $ip = $this->ip;
-        $key_access_count = "block_bot:{$ip}";
-        $number_of_requests = Redis::get($key_access_count);
+        $hits = Redis::get($this->client->key);
+        $host = strtolower(gethostbyaddr($this->client->ip));
 
-        $host = strtolower(gethostbyaddr($ip));
-        $messsage = "[Block-Bots] IP: {$ip}; After {$number_of_requests} requests , Host:{$host} \n  with User agent: {$user_agent};  was {$this->action}";
+        $messsage = "[Block-Bots] IP: {$this->client->ip}; After {$hits} requests, Host: {$host} \n  with User agent: {$this->client->userAgent};  was {$this->action}";
 
-        $ip_info =  $this->config['ip_info_key'];
-
-        if ($ip_info)
-        {
-            $client = new Client();
-            $response = $client->get(
-                "http://ipinfo.io/{$ip}" ,
+        if ($this->options->ip_info_key) {
+            $http = new HTTP();
+            $response = $http->get(
+                "http://ipinfo.io/{$this->client->ip}",
                 [
                     'query' => [
-                        'token' => $ip_info,
+                        'token' => $this->options->ip_info_key,
                     ]
                 ]
             );
+
             $json_response = json_decode($response->getBody(), true);
-            if(array_key_exists('org', $json_response) && array_key_exists('city', $json_response) &&
-                array_key_exists('region', $json_response) && array_key_exists('country', $json_response))
-            {
+
+            if (
+                array_key_exists('org', $json_response) && array_key_exists('city', $json_response) &&
+                array_key_exists('region', $json_response) && array_key_exists('country', $json_response)
+            ) {
                 $org = $json_response["org"];
                 $city = $json_response["city"];
                 $region = $json_response["region"];
@@ -79,20 +71,14 @@ class ProcessLogWithIpInfo implements ShouldQueue
             }
         }
 
-        if ($this->attemped_url){
+        if ($this->attemped_url) {
             $messsage .= " when accessing the URL:{$this->attemped_url} ";
         }
 
-        if (($this->action == 'GOOD_CRAWLER') || ($this->action == 'WHITELISTED'))
-        {
-            Log::stack($this->config['channels_info'])->info($messsage);
+        if (($this->action === 'WHITELISTED') || ($this->action === 'GOOD_CRAWLER')) {
+            Log::stack($this->options->channels_info)->info($messsage);
+        } else {
+            Log::stack($this->options->channels_info)->error($messsage);
         }
-        else{
-            Log::stack($this->config['channels_info'])->error($messsage);
-        }
-
-
-
     }
-
 }
