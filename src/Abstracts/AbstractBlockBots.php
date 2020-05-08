@@ -31,12 +31,24 @@ abstract class AbstractBlockBots
         $this->setClient();
     }
 
+    protected function beforeHandle()
+    {
+    }
 
     protected function setTimeOut()
     {
         switch ($this->frequency) {
+            case 'hourly':
+                $this->timeOutAt = Carbon::now()->addHour(1)->timestamp;
+                break;
             case 'daily':
                 $this->timeOutAt = Carbon::tomorrow()->startOfDay()->timestamp;
+                break;
+            case 'monthly':
+                $this->timeOutAt = (new Carbon('first day of next month'))->firstOfMonth()->startOfDay()->timestamp;
+                break;
+            case 'annually':
+                $this->timeOutAt = (new Carbon('next year'))->startOfYear()->firstOfMonth()->startOfDay()->timestamp;
                 break;
         }
     }
