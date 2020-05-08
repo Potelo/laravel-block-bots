@@ -4,6 +4,7 @@ namespace Potelo\LaravelBlockBots\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Redis;
+use Potelo\LaravelBlockBots\Contracts\Configuration;
 
 class ClearWhitelist extends Command
 {
@@ -29,6 +30,7 @@ class ClearWhitelist extends Command
     public function __construct()
     {
         parent::__construct();
+        $this->options = new Configuration();
     }
 
     /**
@@ -38,11 +40,7 @@ class ClearWhitelist extends Command
      */
     public function handle()
     {
-        //
-        $key_whitelist = "block_bot:whitelist";
-        $whitelist = Redis::del($key_whitelist);
+        Redis::del($this->options->whitelist_key);
         $this->info("Whitelist cleared");
-
-
     }
 }
