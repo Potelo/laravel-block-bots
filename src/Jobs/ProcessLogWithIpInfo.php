@@ -71,8 +71,8 @@ class ProcessLogWithIpInfo implements ShouldQueue
             }
         }
 
-        if ($this->attemped_url) {
-            $messsage .= " when accessing the URL:{$this->attemped_url} ";
+        if ($this->client->url) {
+            $messsage .= " when accessing the URL: {$this->client->url} ";
         }
 
         if (($this->action === 'WHITELISTED') || ($this->action === 'GOOD_CRAWLER')) {
