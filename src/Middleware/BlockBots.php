@@ -38,7 +38,7 @@ class BlockBots extends AbstractBlockBots
         $this->setUp($request, $limit, $frequency);
         $this->countHits();
 
-        return $this->isAllowed() ? $next($this->request) : $this->notAllowed();
+        return $this->isAllowed() ? $next($request) : $this->notAllowed();
     }
 
     /**
@@ -77,8 +77,8 @@ class BlockBots extends AbstractBlockBots
             return false;
         } elseif (Auth::check()) {
             return $this->passesAuthRules() && !$this->isLimitExceeded();
-        } elseif (Auth::guest()) {
-            return $this->passesGuestRules() && !$this->isLimitExceeded();
+        } elseif (Auth::guest() && $this->passesGuestRules() && !$this->isLimitExceeded()) {
+            return true;
         }
 
         return $this->passesBotRules();
@@ -94,6 +94,7 @@ class BlockBots extends AbstractBlockBots
         if (!Redis::exists($this->client->key)) {
             Redis::set($this->client->key, 1);
             Redis::expireat($this->client->key, $this->timeOutAt);
+            return $this->hits = 1;
         }
 
         return $this->hits = Redis::incr($this->client->key);
@@ -104,8 +105,7 @@ class BlockBots extends AbstractBlockBots
         if (!Redis::exists($this->client->logKey)) {
             Redis::set($this->client->logKey, 1);
             Redis::expireat($this->client->logKey, $this->timeOutAt);
-
-            ProcessLogWithIpInfo::dispatch($this->client, "BLOCKED", $this->options);
+            ProcessLogWithIpInfo::dispatch($this->client, "BLOCKED", $this->options, $this->limit);
         }
     }
 
@@ -193,7 +193,6 @@ class BlockBots extends AbstractBlockBots
         if ($this->isWhitelisted()) {
             return true;
         }
-
         //Lets block fake bots
         if (Redis::sismember($this->options->fake_bot_list_key, $this->client->ip)) {
             return false;
@@ -203,7 +202,7 @@ class BlockBots extends AbstractBlockBots
             // While the bot is on pending_list, it's unchecked, so we allow this bot to pass-thru
             if (!Redis::sismember($this->options->pending_bot_list_key, $this->client->ip)) {
                 // If we got here, it is an unknown bot. Let's create a job to test it
-                CheckIfBotIsReal::dispatch($this->client, $this->getAllowedBots());
+                CheckIfBotIsReal::dispatch($this->client, $this->getAllowedBots(), $this->options);
                 Redis::sadd($this->options->pending_bot_list_key, $this->client->ip);
             }
 

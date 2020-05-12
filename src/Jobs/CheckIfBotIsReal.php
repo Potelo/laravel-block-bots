@@ -16,6 +16,7 @@ class CheckIfBotIsReal implements ShouldQueue
 
     protected $client;
     protected $options;
+    protected $allowedBots;
 
 
     /**
@@ -52,7 +53,7 @@ class CheckIfBotIsReal implements ShouldQueue
         }
 
         // Lets remove from the pending list
-        Redis::srem($this->options->pending_bots_key, $this->client->ip);
+        Redis::srem($this->options->pending_bot_list_key, $this->client->ip);
         if ($this->isValid($found_bot_key)) {
             Redis::sadd($this->options->whitelist_key, $this->client->ip);
 

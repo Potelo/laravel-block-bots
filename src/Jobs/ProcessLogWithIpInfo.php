@@ -18,7 +18,7 @@ class ProcessLogWithIpInfo implements ShouldQueue
     protected $action;
     protected $client;
     protected $options;
-
+    protected $accessLimit;
 
     /**
      * Checks whether the given IP address really belongs to a valid host or not
@@ -26,11 +26,14 @@ class ProcessLogWithIpInfo implements ShouldQueue
      * @param $ip the IP address to check
      * @return bool true if the given IP address belongs to any of the valid hosts, otherwise false
      */
-    public function __construct($client, $action, $options = null)
+    public function __construct($client, $action, $options = null, $accessLimit = null)
     {
         $this->action = $action;
         $this->client = $client;
         $this->options = $options;
+        if (!is_null($accessLimit)) {
+            $this->accessLimit = $accessLimit;
+        }
     }
 
     /**
@@ -43,7 +46,11 @@ class ProcessLogWithIpInfo implements ShouldQueue
         $hits = Redis::get($this->client->key);
         $host = strtolower(gethostbyaddr($this->client->ip));
 
-        $messsage = "[Block-Bots] IP: {$this->client->ip}; After {$hits} requests, Host: {$host} \n  with User agent: {$this->client->userAgent};  was {$this->action}";
+        if (!empty($this->accessLimit)) {
+            $message = "[Block-Bots] IP: {$this->client->ip}; After {$hits}/{$this->accessLimit} requests, Host: {$host} \n  with User agent: {$this->client->userAgent};  was {$this->action}";
+        } else {
+            $message = "[Block-Bots] IP: {$this->client->ip}; After {$hits} requests, Host: {$host} \n  with User agent: {$this->client->userAgent};  was {$this->action}";
+        }
 
         if ($this->options->ip_info_key) {
             $http = new HTTP();
@@ -67,18 +74,18 @@ class ProcessLogWithIpInfo implements ShouldQueue
                 $region = $json_response["region"];
                 $country = $json_response["country"];
 
-                $messsage .= "Org: {$org} | city: {$city} | region: {$region} | country: {$country} ";
+                $message .= "Org: {$org} | city: {$city} | region: {$region} | country: {$country} ";
             }
         }
 
         if ($this->client->url) {
-            $messsage .= " when accessing the URL: {$this->client->url} ";
+            $message .= " when accessing the URL: {$this->client->url} ";
         }
 
         if (($this->action === 'WHITELISTED') || ($this->action === 'GOOD_CRAWLER')) {
-            Log::stack($this->options->channels_info)->info($messsage);
+            Log::stack($this->options->channels_info)->info($message);
         } else {
-            Log::stack($this->options->channels_info)->error($messsage);
+            Log::stack($this->options->channels_info)->error($message);
         }
     }
 }
