@@ -49,7 +49,9 @@ class BlockBots extends AbstractBlockBots
     protected function notAllowed()
     {
         if ($this->options->log) {
-            $this->logDisallowance();
+            if (!$this->options->log_only_guest || Auth::guest()) {
+                $this->logDisallowance();
+            }
         }
 
         if (Auth::check() && $this->isTheFirstOverflow()) {

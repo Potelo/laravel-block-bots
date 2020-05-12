@@ -54,6 +54,7 @@ return [
      */
 
     'log' => env('BLOCK_BOTS_LOG_ENABLED', env('BLOCK_BOTS_LOG_BLOCKED_REQUESTS', true)),
+    'log_only_guest' => env('BLOCK_BOTS_LOG_ONLY_GUEST', true),
 
     /*
      * The list of allowed user-agents. The value of the key should be a keyword in hostname or * for enable to everyone
