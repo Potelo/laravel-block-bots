@@ -49,7 +49,7 @@ class CheckIfBotIsReal implements ShouldQueue
         }
 
         if (is_null($found_bot_key)) {
-            throw new \InvalidArgumentException("I did not found {$found_bot_key} key");
+            throw new \InvalidArgumentException("I did not found \"{$this->client->userAgent}\" key");
         }
 
         // Lets remove from the pending list
