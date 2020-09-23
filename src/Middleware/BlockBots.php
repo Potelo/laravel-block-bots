@@ -140,7 +140,9 @@ class BlockBots extends AbstractBlockBots
         if (in_array($this->client->ip, $this->options->whitelist_ips)) {
             //Add this to the redis list as it is faster
             Redis::sadd($this->options->whitelist_key, $this->client->ip);
-            ProcessLogWithIpInfo::dispatch($this->client, 'WHITELISTED', $this->options);
+            if ($this->options->log) {
+                ProcessLogWithIpInfo::dispatch($this->client, 'WHITELISTED', $this->options);
+            }
             return true;
         }
 
