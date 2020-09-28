@@ -42,7 +42,7 @@ class CheckIfBotIsReal implements ShouldQueue
         $found_bot_key = null;
 
         foreach (array_keys($this->allowedBots) as $bot) {
-            if (strpos($this->client->userAgent, strtolower($bot)) !== false) {
+            if (strpos(strtolower($this->client->userAgent), strtolower($bot)) !== false) {
                 $found_bot_key = $bot;
                 break;
             }
