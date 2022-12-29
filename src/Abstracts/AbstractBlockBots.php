@@ -14,9 +14,8 @@ abstract class AbstractBlockBots
     protected $frequency;
     protected $options;
     protected $client;
-    protected $timeOutAt;
     protected $hits = 1;
-    protected $countHits = true;
+    protected $incrementHits = true;
 
     public function __construct()
     {
@@ -28,30 +27,11 @@ abstract class AbstractBlockBots
         $this->setRequest($request);
         $this->setLimit($limit);
         $this->setFrequency($frequency);
-        $this->setTimeOut($frequency);
         $this->setClient();
     }
 
     protected function beforeHandle()
     {
-    }
-
-    protected function setTimeOut()
-    {
-        switch ($this->frequency) {
-            case 'hourly':
-                $this->timeOutAt = Carbon::now()->addHour(1)->timestamp;
-                break;
-            case 'daily':
-                $this->timeOutAt = Carbon::tomorrow()->startOfDay()->timestamp;
-                break;
-            case 'monthly':
-                $this->timeOutAt = (new Carbon('first day of next month'))->firstOfMonth()->startOfDay()->timestamp;
-                break;
-            case 'annually':
-                $this->timeOutAt = (new Carbon('next year'))->startOfYear()->firstOfMonth()->startOfDay()->timestamp;
-                break;
-        }
     }
 
     protected function setRequest($request)
@@ -97,8 +77,6 @@ abstract class AbstractBlockBots
         return $this->hits === $this->limit + 1;
     }
 
-    abstract protected function countHits();
-
     abstract protected function isAllowed();
 
     abstract protected function notAllowed();
@@ -106,8 +84,8 @@ abstract class AbstractBlockBots
     /**
      * @return void
      */
-    protected function dontCountHits()
+    protected function dontIncrementHits()
     {
-        $this->countHits = false;
+        $this->incrementHits = false;
     }
 }

@@ -36,9 +36,7 @@ class BlockBots extends AbstractBlockBots
         }
 
         $this->setUp($request, $limit, $frequency);
-        if ($this->countHits) {
-            $this->countHits();
-        }
+        $this->hits = $this->client->countHits($this->incrementHits, $frequency);
 
         return $this->isAllowed() ? $next($request) : $this->notAllowed();
     }
@@ -52,7 +50,7 @@ class BlockBots extends AbstractBlockBots
     {
         if ($this->options->log) {
             if (!$this->options->log_only_guest || Auth::guest()) {
-                $this->logDisallowance();
+                $this->client->logDisallowance($this->options, $this->limit);
             }
         }
 
@@ -86,31 +84,6 @@ class BlockBots extends AbstractBlockBots
         }
 
         return $this->passesBotRules();
-    }
-
-    /**
-     * Returns the value of the access counter
-     *
-     * @return void
-     */
-    protected function countHits()
-    {
-        if (!Redis::exists($this->client->key)) {
-            Redis::set($this->client->key, 1);
-            Redis::expireat($this->client->key, $this->timeOutAt);
-            return $this->hits = 1;
-        }
-
-        return $this->hits = Redis::incr($this->client->key);
-    }
-
-    private function logDisallowance()
-    {
-        if (!Redis::exists($this->client->logKey)) {
-            Redis::set($this->client->logKey, 1);
-            Redis::expireat($this->client->logKey, $this->timeOutAt);
-            ProcessLogWithIpInfo::dispatch($this->client, "BLOCKED", $this->options, $this->limit);
-        }
     }
 
     /**
