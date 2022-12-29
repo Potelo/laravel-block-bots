@@ -72,14 +72,14 @@ Than you can put in the desired groups. For exemple, lets set to the Wrb group:
         'web' => [
             ...
             \App\Http\Middleware\VerifyCsrfToken::class,
-            'block:100,/limit'
+            'block:100,daily', // 100 requests per day.
         ],
 ```
 
 Where:
 
 - **100**: is the number of pages an IP can access every day
-- **/limit**: Is the route we going to redirect the IP after the limit
+- **daily**: is the time period. Options: `hourly`,`daily`, `weekly`, `monthly`, `annually`
 
 ## Change log
 
