@@ -36,7 +36,9 @@ class BlockBots extends AbstractBlockBots
         }
 
         $this->setUp($request, $limit, $frequency);
-        $this->countHits();
+        if ($this->countHits) {
+            $this->countHits();
+        }
 
         return $this->isAllowed() ? $next($request) : $this->notAllowed();
     }

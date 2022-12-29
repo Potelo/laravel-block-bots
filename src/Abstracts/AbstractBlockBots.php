@@ -16,6 +16,7 @@ abstract class AbstractBlockBots
     protected $client;
     protected $timeOutAt;
     protected $hits = 1;
+    protected $countHits = true;
 
     public function __construct()
     {
@@ -101,4 +102,12 @@ abstract class AbstractBlockBots
     abstract protected function isAllowed();
 
     abstract protected function notAllowed();
+
+    /**
+     * @return void
+     */
+    protected function dontCountHits()
+    {
+        $this->countHits = false;
+    }
 }
