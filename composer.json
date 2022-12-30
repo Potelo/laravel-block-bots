@@ -1,31 +1,45 @@
 {
-    "name": "potelo/laravel-block-bots",
-    "description": "Block bots and high traffic offenders using Redis",
-    "authors": [
-        {
-            "name": "Bruno Cabral",
-            "email": "bruno@potelo.com.br"
-        }
-    ],
-    "require": {
-      "illuminate/support": "^5.5|^6.0|^7.0|^8.0",
-      "predis/predis": "^1.1",
-      "php" : "^7.0"
-    },
-
-    "minimum-stability": "dev",
-
-    "autoload": {
-      "psr-4": {
-        "Potelo\\LaravelBlockBots\\": "src"
-      }
-    },
-
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Potelo\\LaravelBlockBots\\BlockBotsServiceProvider"
-            ]
-        }
+  "name": "potelo/laravel-block-bots",
+  "description": "Block bots and high traffic offenders using Redis",
+  "authors": [
+    {
+      "name": "Bruno Cabral",
+      "email": "bruno@potelo.com.br"
     }
+  ],
+  "scripts": {
+    "test": "phpunit"
+  },
+  "require": {
+    "php" : "^7.1 || ^8.0",
+    "laravel/framework": "^5.5|^6.0|^7.0|^8.0",
+    "predis/predis": "^1.1",
+    "guzzlehttp/guzzle": "^7.5.0",
+    "ext-json": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5",
+    "orchestra/testbench": "^6.0"
+  },
+
+  "minimum-stability": "dev",
+
+  "autoload": {
+    "psr-4": {
+      "Potelo\\LaravelBlockBots\\": "src"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Potelo\\LaravelBlockBots\\Tests\\": "tests"
+    }
+  },
+
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Potelo\\LaravelBlockBots\\BlockBotsServiceProvider"
+      ]
+    }
+  }
 }
