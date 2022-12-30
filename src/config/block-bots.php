@@ -85,4 +85,9 @@ return [
     'json_response' => [
         'message' => 'Você está acima do limite.'
     ],
+
+    /*
+     * Default timezone for store Redis TTL
+     */
+    'timezone' => 'UTC',
 ];

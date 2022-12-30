@@ -24,6 +24,7 @@ class Client
         $this->key = "block_bot:{$this->id}";
         $this->logKey = "block_bot:notified:{$this->ip}";
         $this->url = substr($request->fullUrl(), strlen($request->getScheme() . "://"));
+        $this->options = new Configuration();
     }
 
     /**
@@ -67,13 +68,13 @@ class Client
     {
         switch ($frequency) {
             case 'hourly':
-                return Carbon::now()->addHour(1)->timestamp;
+                return Carbon::now($this->options->timezone)->addHour(1)->timestamp;
             case 'daily':
-                return Carbon::tomorrow()->startOfDay()->timestamp;
+                return Carbon::tomorrow($this->options->timezone)->startOfDay()->timestamp;
             case 'monthly':
-                return (new Carbon('first day of next month'))->firstOfMonth()->startOfDay()->timestamp;
+                return (new Carbon('first day of next month', $this->options->timezone))->firstOfMonth()->startOfDay()->timestamp;
             case 'annually':
-                return (new Carbon('next year'))->startOfYear()->firstOfMonth()->startOfDay()->timestamp;
+                return (new Carbon('next year', $this->options->timezone))->startOfYear()->firstOfMonth()->startOfDay()->timestamp;
         }
     }
 }
