@@ -29,13 +29,13 @@ class BlockBots extends AbstractBlockBots
      */
     public function handle($request, Closure $next, $limit = 100, $frequency = 'daily')
     {
+        $this->setUp($request, $limit, $frequency);
         $this->beforeHandle();
 
         if (!$this->options->enabled) {
             return $next($request);
         }
 
-        $this->setUp($request, $limit, $frequency);
         $this->hits = $this->client->countHits($this->incrementHits, $frequency);
 
         return $this->isAllowed() ? $next($request) : $this->notAllowed();
