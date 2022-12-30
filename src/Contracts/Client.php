@@ -52,12 +52,12 @@ class Client
     /**
      * @return void
      */
-    public function logDisallowance($options, $limit)
+    public function logDisallowance($limit, $frequency = 'daily')
     {
         if (!Redis::exists($this->logKey)) {
             Redis::set($this->logKey, 1);
-            Redis::expireat($this->logKey, $this->timeOutAt);
-            ProcessLogWithIpInfo::dispatch($this->client, "BLOCKED", $options, $limit);
+            Redis::expireat($this->logKey, $this->getTimeoutAt($frequency));
+            ProcessLogWithIpInfo::dispatch($this, "BLOCKED", $this->options, $limit);
         }
     }
 

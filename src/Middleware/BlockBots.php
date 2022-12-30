@@ -50,7 +50,7 @@ class BlockBots extends AbstractBlockBots
     {
         if ($this->options->log) {
             if (!$this->options->log_only_guest || Auth::guest()) {
-                $this->client->logDisallowance($this->options, $this->limit);
+                $this->client->logDisallowance($this->limit, $this->frequency);
             }
         }
 
