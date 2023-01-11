@@ -19,7 +19,7 @@ class Client
     /**
      * @var \Potelo\LaravelBlockBots\Contracts\Configuration
      */
-    private Configuration $options;
+    private $options;
 
     public function __construct($request)
     {
