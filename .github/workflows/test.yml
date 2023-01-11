@@ -1,0 +1,13 @@
+name: Tests
+on: [pull_request]
+jobs:
+  phpunit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build container
+        run: docker-compose build
+      - name: Install dependencies
+        run: docker-compose run --rm laravel_block_bots composer install
+      - name: Run tests
+        run: docker-compose run --rm laravel_block_bots composer run test
