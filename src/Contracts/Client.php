@@ -30,7 +30,7 @@ class Client
     /**
      * Returns the value of the access counter
      *
-     * @return void
+     * @return int
      */
     public function countHits($incrementHits = true, $frequency = 'daily')
     {
