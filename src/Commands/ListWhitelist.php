@@ -23,6 +23,11 @@ class ListWhitelist extends Command
     protected $description = 'Show the list of IPs that are Whitelisted';
 
     /**
+     * @var \Potelo\LaravelBlockBots\Contracts\Configuration
+     */
+    private $options;
+
+    /**
      * Create a new command instance.
      *
      * @return void
@@ -36,7 +41,7 @@ class ListWhitelist extends Command
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @return void
      */
     public function handle()
     {
