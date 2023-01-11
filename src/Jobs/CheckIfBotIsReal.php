@@ -3,12 +3,11 @@
 namespace Potelo\LaravelBlockBots\Jobs;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Support\Facades\Redis;
-use Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo;
 
 class CheckIfBotIsReal implements ShouldQueue
 {
@@ -22,8 +21,9 @@ class CheckIfBotIsReal implements ShouldQueue
     /**
      * Checks whether the given IP address really belongs to a valid host or not
      *
-     * @param $this->client->ip the IP address to check
-     * @return bool true if the given IP address belongs to any of the valid hosts, otherwise false
+     * @param $client $client->ip the IP address to check
+     * @param $allowedBots
+     * @param $options
      */
     public function __construct($client, $allowedBots, $options)
     {
