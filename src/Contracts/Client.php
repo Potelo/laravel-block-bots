@@ -16,6 +16,11 @@ class Client
     public $logKey;
     public $url;
 
+    /**
+     * @var \Potelo\LaravelBlockBots\Contracts\Configuration
+     */
+    private Configuration $options;
+
     public function __construct($request)
     {
         $this->ip = $request->getClientIp();
