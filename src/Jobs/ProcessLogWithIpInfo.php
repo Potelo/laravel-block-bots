@@ -2,14 +2,14 @@
 
 namespace Potelo\LaravelBlockBots\Jobs;
 
-use GuzzleHttp\Client as HTTP;
 use Illuminate\Bus\Queueable;
+use GuzzleHttp\Client as HTTP;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Facades\Log;
 
 class ProcessLogWithIpInfo implements ShouldQueue
 {
@@ -20,11 +20,13 @@ class ProcessLogWithIpInfo implements ShouldQueue
     protected $options;
     protected $accessLimit;
 
+
     /**
      * Checks whether the given IP address really belongs to a valid host or not
-     *
-     * @param $ip the IP address to check
-     * @return bool true if the given IP address belongs to any of the valid hosts, otherwise false
+     * @param $client
+     * @param $action
+     * @param $options
+     * @param $accessLimit
      */
     public function __construct($client, $action, $options = null, $accessLimit = null)
     {
