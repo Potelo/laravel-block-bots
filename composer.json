@@ -8,18 +8,18 @@
     }
   ],
   "scripts": {
-    "test": "phpunit"
+    "test": "XDEBUG_MODE=coverage phpunit --coverage-text"
   },
   "require": {
     "php" : "^7.1 || ^8.0",
-    "laravel/framework": "^5.5|^6.0|^7.0|^8.0",
+    "laravel/framework": "^5.5|^6.0|^7.0|^8.0|^9.0",
     "predis/predis": "^1.1",
     "guzzlehttp/guzzle": "^7.5.0",
     "ext-json": "*"
   },
   "require-dev": {
     "phpunit/phpunit": "^9.5",
-    "orchestra/testbench": "^6.0"
+    "orchestra/testbench": "^7.0"
   },
 
   "minimum-stability": "dev",
