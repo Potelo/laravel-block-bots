@@ -3,16 +3,13 @@
 namespace Potelo\LaravelBlockBots\Middleware;
 
 use Closure;
-
 use Carbon\Carbon;
-
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Auth;
-
-use Potelo\LaravelBlockBots\Abstracts\AbstractBlockBots;
-use Potelo\LaravelBlockBots\Events\UserBlockedEvent;
+use Illuminate\Support\Facades\Redis;
 use Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal;
+use Potelo\LaravelBlockBots\Events\UserBlockedEvent;
 use Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo;
+use Potelo\LaravelBlockBots\Abstracts\AbstractBlockBots;
 
 
 class BlockBots extends AbstractBlockBots
@@ -21,11 +18,11 @@ class BlockBots extends AbstractBlockBots
     /**
      * Executes the middleware
      *
-     * @param Request $request
+     * @param \Illuminate\Http\Request $request
      * @param Closure $next
      * @param int $limit
      * @param string $frequency
-     * @return void
+     * @return mixed
      */
     public function handle($request, Closure $next, $limit = 100, $frequency = 'daily')
     {
@@ -44,7 +41,7 @@ class BlockBots extends AbstractBlockBots
     /**
      * Responses to disallowed client
      *
-     * @return response
+     * @return \Illuminate\Contracts\Foundation\Application|\Illuminate\Contracts\Routing\ResponseFactory|\Illuminate\Http\JsonResponse|\Illuminate\Http\Response
      */
     protected function notAllowed()
     {

@@ -23,6 +23,11 @@ class ClearWhitelist extends Command
     protected $description = 'Clear the White-list';
 
     /**
+     * @var \Potelo\LaravelBlockBots\Contracts\Configuration
+     */
+    private $options;
+
+    /**
      * Create a new command instance.
      *
      * @return void
@@ -36,7 +41,7 @@ class ClearWhitelist extends Command
     /**
      * Execute the console command.
      *
-     * @return mixed
+     * @return void
      */
     public function handle()
     {

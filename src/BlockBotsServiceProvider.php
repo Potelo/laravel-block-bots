@@ -25,7 +25,7 @@ class BlockBotsServiceProvider extends ServiceProvider
 
         $this->publishes([
             __DIR__ . '/config/block-bots.php' => config_path('block-bots.php'),
-        ]);
+        ], 'config');
 
         $this->loadViewsFrom(__DIR__ . '/views', 'block-bots');
 

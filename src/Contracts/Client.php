@@ -16,6 +16,11 @@ class Client
     public $logKey;
     public $url;
 
+    /**
+     * @var \Potelo\LaravelBlockBots\Contracts\Configuration
+     */
+    private $options;
+
     public function __construct($request)
     {
         $this->ip = $request->getClientIp();
@@ -30,7 +35,7 @@ class Client
     /**
      * Returns the value of the access counter
      *
-     * @return void
+     * @return int
      */
     public function countHits($incrementHits = true, $frequency = 'daily')
     {

@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  laravel_block_bots:
+    container_name: laravel_block_bots
+    build: .
+    working_dir: /var/www/html
+    volumes:
+      - ./:/var/www/html
+    image: laravel_block_bots
+    depends_on:
+      - redis
+    networks:
+      laravel_block_bots_network:
+        ipv4_address: 172.11.238.101
+
+  redis:
+    container_name: laravel_block_bots_redis
+    image: redis:5.0.5-alpine
+    command: redis-server
+    networks:
+        laravel_block_bots_network:
+            ipv4_address: 172.11.238.100
+networks:
+    laravel_block_bots_network:
+        driver: bridge
+        ipam:
+          driver: default
+          config:
+            - subnet: 172.11.238.0/24
+              gateway: 172.11.238.1
