@@ -83,6 +83,14 @@ abstract class AbstractBlockBots
     /**
      * @return void
      */
+    protected function canIncrementHits()
+    {
+        $this->incrementHits = true;
+    }
+
+    /**
+     * @return void
+     */
     protected function dontIncrementHits()
     {
         $this->incrementHits = false;
