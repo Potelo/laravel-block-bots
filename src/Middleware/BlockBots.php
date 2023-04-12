@@ -98,11 +98,23 @@ class BlockBots extends AbstractBlockBots
     }
 
     /**
+     * @return mixed|string|null
+     */
+    public function getMatchedBot()
+    {
+        foreach (array_keys($this->getAllowedBots()) as $bot) {
+            if (strpos(strtolower($this->client->userAgent), strtolower($bot)) !== false) {
+                return $bot;
+            }
+        }
+    }
+
+    /**
      * Check if the client is whitelisted.
      *
      * @return bool
      */
-    private function isWhitelisted()
+    public function isWhitelisted()
     {
         if (Redis::sismember($this->options->whitelist_key, $this->client->ip)) {
             return true;
