@@ -1,5 +1,5 @@
 {
-  "name": "potelo/laravel-block-bots",
+  "name": "coliving/laravel-block-bots",
   "description": "Block bots and high traffic offenders using Redis. This is forked from Potelo/laravel-block-bots to make it support Laravel 10",
   "authors": [
     {
@@ -11,7 +11,7 @@
     "test": "XDEBUG_MODE=coverage phpunit --coverage-text"
   },
   "require": {
-    "php" : "^7.1 || ^8.0 || ^8.1",
+    "php" : "^7.1 || ^8.0 || ^8.1 || ^8.2",
     "laravel/framework": "^5.5|^6.0|^7.0|^8.0|^9.0|^10.0",
     "predis/predis": "^1.1",
     "guzzlehttp/guzzle": "^7.5.0",
