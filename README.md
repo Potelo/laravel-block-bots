@@ -6,7 +6,7 @@
 
 ## Introduction
 
-Laravel Block bots is a pacakge that block bad crawlers, people trying to scrape your website or high-usage users, but lets good and important crawlers such as GoogleBot and Bing pass-thu. (This is forked from Potelo/laravel-block-bots to make it support Laravel 10.)
+Laravel Block bots is a pacakge that block bad crawlers, people trying to scrape your website or high-usage users, but lets good and important crawlers such as GoogleBot and Bing pass-thu.
 
 ## Features
 
@@ -21,7 +21,7 @@ Laravel Block bots is a pacakge that block bad crawlers, people trying to scrape
 Via Composer
 
 ```bash
-composer require coliving/laravel-block-bots
+composer require potelo/laravel-block-bots
 ```
 
 #### Requirement

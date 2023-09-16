@@ -1,10 +1,10 @@
 {
-  "name": "coliving/laravel-block-bots",
-  "description": "Block bots and high traffic offenders using Redis. This is forked from Potelo/laravel-block-bots to make it support Laravel 10",
+  "name": "potelo/laravel-block-bots",
+  "description": "Block bots and high traffic offenders using Redis",
   "authors": [
     {
-      "name": "Dzung Nguyen",
-      "email": "dungnh@gmail.com"
+      "name": "Bruno Cabral",
+      "email": "bruno@potelo.com.br"
     }
   ],
   "scripts": {
