@@ -3,8 +3,10 @@
 namespace Potelo\LaravelBlockBots;
 
 use Illuminate\Support\ServiceProvider;
-use Potelo\LaravelBlockBots\Commands\ListWhitelist;
 use Potelo\LaravelBlockBots\Commands\ClearWhitelist;
+use Potelo\LaravelBlockBots\Commands\ListWhitelist;
+use Potelo\LaravelBlockBots\Commands\ListHits;
+use Potelo\LaravelBlockBots\Commands\ListNotified;
 
 class BlockBotsServiceProvider extends ServiceProvider
 {
@@ -18,8 +20,10 @@ class BlockBotsServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
-                ListWhitelist::class,
                 ClearWhitelist::class,
+                ListWhitelist::class,
+                ListHits::class,
+                ListNotified::class,
             ]);
         }
 

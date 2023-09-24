@@ -26,7 +26,7 @@ class Client
         $this->ip = $request->getClientIp();
         $this->id = Auth::check() ? Auth::id() : $this->ip;
         $this->userAgent = $request->header('User-Agent');
-        $this->key = "block_bot:{$this->id}";
+        $this->key = "block_bot:hits:{$this->id}";
         $this->logKey = "block_bot:notified:{$this->ip}";
         $this->url = substr($request->fullUrl(), strlen($request->getScheme() . "://"));
         $this->options = new Configuration();
