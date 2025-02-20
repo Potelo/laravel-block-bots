@@ -1,18 +1,32 @@
 name: Tests
+
 on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   phpunit-tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         php: ['8.2', '8.3', '8.4']
+      fail-fast: false
     steps:
       - uses: actions/checkout@v3
+      
       - name: Update PHP version in Dockerfile
         run: sed -i "s/FROM php:8.2-cli/FROM php:${{ matrix.php }}-cli/" Dockerfile
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
       - name: Build container
         run: docker-compose build
+      
       - name: Install dependencies
         run: docker-compose run --rm laravel_block_bots composer install
+      
       - name: Run tests
         run: docker-compose run --rm laravel_block_bots composer run test
