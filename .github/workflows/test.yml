@@ -3,8 +3,13 @@ on: [push, pull_request]
 jobs:
   phpunit-tests:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        php: ['8.2', '8.3', '8.4']
     steps:
       - uses: actions/checkout@v3
+      - name: Update PHP version in Dockerfile
+        run: sed -i "s/FROM php:8.2-cli/FROM php:${{ matrix.php }}-cli/" Dockerfile
       - name: Build container
         run: docker-compose build
       - name: Install dependencies
