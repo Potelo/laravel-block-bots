@@ -9,6 +9,16 @@ concurrency:
 jobs:
   phpunit-tests:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:5.0.5-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     strategy:
       matrix:
         php: ['8.2', '8.3', '8.4']
@@ -23,10 +33,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
       
       - name: Build container
-        run: docker-compose build
+        run: docker compose build
       
       - name: Install dependencies
-        run: docker-compose run --rm laravel_block_bots composer install
+        run: docker compose run --rm laravel_block_bots composer install
       
       - name: Run tests
-        run: docker-compose run --rm laravel_block_bots composer run test
+        run: docker compose run --rm laravel_block_bots composer run test
