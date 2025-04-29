@@ -6,6 +6,7 @@ use Closure;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal;
 use Potelo\LaravelBlockBots\Events\UserBlockedEvent;
 use Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo;
@@ -120,8 +121,9 @@ class BlockBots extends AbstractBlockBots
             return true;
         }
 
-        //Lets verify if its on our whitelist
-        if (in_array($this->client->ip, $this->options->whitelist_ips)) {
+        $ips = $this->options->whitelist_ips;
+
+        if (IpUtils::checkIp($this->client->ip, $ips)) {
             //Add this to the redis list as it is faster
             Redis::sadd($this->options->whitelist_key, $this->client->ip);
             if ($this->options->log) {
