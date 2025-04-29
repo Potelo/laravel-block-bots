@@ -18,6 +18,7 @@ class BlockBotsMiddlewareTest extends TestCase
         Queue::fake();
         $middleware = new BlockBots();
         $request = new Request();
+        $request->server->set('REMOTE_ADDR', '192.168.2.1');
 
         $limit = 10;
 
@@ -41,6 +42,7 @@ class BlockBotsMiddlewareTest extends TestCase
         Queue::fake();
         $middleware = new BlockBots();
         $request = new Request();
+        $request->server->set('REMOTE_ADDR', '192.168.2.2');
 
         $limit = 10;
 
@@ -75,6 +77,7 @@ class BlockBotsMiddlewareTest extends TestCase
 
         $middleware = new BlockBots();
         $request = new Request();
+        $request->server->set('REMOTE_ADDR', '192.168.2.3');
 
         $limit = 100;
 
