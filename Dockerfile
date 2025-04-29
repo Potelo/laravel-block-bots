@@ -14,4 +14,4 @@ VOLUME /var/www/html
 
 COPY --from=composer /usr/bin/composer /usr/bin/composer
 
-CMD ["composer", "install"]
+CMD composer install && tail -f /dev/null
