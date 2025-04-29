@@ -5,9 +5,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      # Install Docker Compose before using it
+      - name: Install Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose-plugin
+          docker compose version
+
       - name: Build container
-        run: docker-compose build
+        run: docker compose build
+
       - name: Install dependencies
-        run: docker-compose run --rm laravel_block_bots composer install
+        run: docker compose run --rm laravel_block_bots composer install
+
       - name: Run tests
-        run: docker-compose run --rm laravel_block_bots composer run test
+        run: docker compose run --rm laravel_block_bots composer run test
