@@ -11,7 +11,7 @@ use Potelo\LaravelBlockBots\Jobs\CheckIfBotIsReal;
 use Potelo\LaravelBlockBots\Events\UserBlockedEvent;
 use Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo;
 use Potelo\LaravelBlockBots\Abstracts\AbstractBlockBots;
-
+use Potelo\LaravelBlockBots\Events\BotBlockedEvent;
 
 class BlockBots extends AbstractBlockBots
 {
@@ -56,6 +56,9 @@ class BlockBots extends AbstractBlockBots
             event(new UserBlockedEvent(Auth::user(), $this->hits, Carbon::now()));
         }
 
+        if (Auth::guest() && $this->isTheFirstOverflow()) {
+            event(new BotBlockedEvent($this->client->ip, $this->hits, Carbon::now()));
+        }
 
         if ($this->request->expectsJson()) {
             return response()->json($this->options->json_response, 429);
