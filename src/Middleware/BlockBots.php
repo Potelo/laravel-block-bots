@@ -199,8 +199,8 @@ class BlockBots extends AbstractBlockBots
             // While the bot is on pending_list, it's unchecked, so we allow this bot to pass-thru
             if (!Redis::sismember($this->options->pending_bot_list_key, $this->client->ip)) {
                 // If we got here, it is an unknown bot. Let's create a job to test it
-                CheckIfBotIsReal::dispatch($this->client, $this->getAllowedBots(), $this->options);
                 Redis::sadd($this->options->pending_bot_list_key, $this->client->ip);
+                CheckIfBotIsReal::dispatch($this->client, $this->getAllowedBots(), $this->options);
             }
 
             return true;
