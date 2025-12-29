@@ -5,12 +5,27 @@ namespace Potelo\LaravelBlockBots\Contracts;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
+use Potelo\LaravelBlockBots\Helpers\IpHelper;
 use Potelo\LaravelBlockBots\Jobs\ProcessLogWithIpInfo;
 
 class Client
 {
     public $id;
+    
+    /**
+     * The original client IP address.
+     * Used for reverse DNS lookups and logging.
+     * @var string|null
+     */
     public $ip;
+    
+    /**
+     * The trackable IP address (normalized IPv6 prefix or original IPv4).
+     * Used for rate limiting, whitelisting, and Redis key generation.
+     * @var string|null
+     */
+    public $trackableIp;
+    
     public $userAgent;
     public $key;
     public $logKey;
@@ -23,13 +38,23 @@ class Client
 
     public function __construct($request)
     {
-        $this->ip = $request->getClientIp();
-        $this->id = Auth::check() ? Auth::id() : $this->ip;
+        $this->options = new Configuration();
+        
+        $originalIp = $request->getClientIp();
+        $this->ip = $originalIp;
+        
+        // Get the trackable IP (normalized prefix for IPv6, original for IPv4)
+        $this->trackableIp = IpHelper::getTrackableIp(
+            $originalIp,
+            $this->options->ipv6_prefix_length ?? 64
+        );
+        
+        // Use trackable IP for rate limiting identification
+        $this->id = Auth::check() ? Auth::id() : $this->trackableIp;
         $this->userAgent = $request->header('User-Agent');
         $this->key = "block_bot:hits:{$this->id}";
-        $this->logKey = "block_bot:notified:{$this->ip}";
+        $this->logKey = "block_bot:notified:{$this->trackableIp}";
         $this->url = substr($request->fullUrl(), strlen($request->getScheme() . "://"));
-        $this->options = new Configuration();
     }
 
     /**

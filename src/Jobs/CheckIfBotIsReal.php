@@ -8,6 +8,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Potelo\LaravelBlockBots\Helpers\IpHelper;
 
 class CheckIfBotIsReal implements ShouldQueue
 {
@@ -54,16 +55,22 @@ class CheckIfBotIsReal implements ShouldQueue
             throw new \InvalidArgumentException("I did not found \"{$this->client->userAgent}\" key{$ip}");
         }
 
-        // Lets remove from the pending list
-        Redis::srem($this->options->pending_bot_list_key, $this->client->ip);
+        // Use trackable IP (normalized IPv6 prefix) for Redis operations
+        $trackableIp = $this->client->trackableIp ?? $this->client->ip;
+
+        // Remove from the pending list
+        Redis::srem($this->options->pending_bot_list_key, $trackableIp);
+        
         if ($this->isValid($found_bot_key)) {
-            Redis::sadd($this->options->whitelist_key, $this->client->ip);
+            // Add to whitelist using trackable IP (entire prefix gets whitelisted)
+            Redis::sadd($this->options->whitelist_key, $trackableIp);
 
             if ($this->options->log) {
                 ProcessLogWithIpInfo::dispatch($this->client, 'GOOD_CRAWLER', $this->options);
             }
         } else {
-            Redis::sadd($this->options->fake_bot_list_key, $this->client->ip);
+            // Add to fake bot list using trackable IP
+            Redis::sadd($this->options->fake_bot_list_key, $trackableIp);
 
             if ($this->options->log) {
                 ProcessLogWithIpInfo::dispatch($this->client, 'BAD_CRAWLER', $this->options);
@@ -71,10 +78,29 @@ class CheckIfBotIsReal implements ShouldQueue
         }
     }
 
+    /**
+     * Validate if the bot is legitimate using reverse DNS verification.
+     *
+     * For IPv6 addresses, this uses the original IP for DNS lookups but
+     * compares the result considering that the forward DNS might return
+     * a different IP within the same prefix.
+     *
+     * @param string $found_bot_key
+     * @return bool
+     */
     private function isValid($found_bot_key)
     {
-        if (filter_var($this->client->ip, FILTER_VALIDATE_IP) === false) {
+        // Use original IP for validation
+        $originalIp = $this->client->ip;
+        
+        if (filter_var($originalIp, FILTER_VALIDATE_IP) === false) {
             return false;
+        }
+
+        // Check if bot has IP ranges configured (takes priority over DNS)
+        $ipRanges = $this->options->allowed_bots_by_ip[strtolower($found_bot_key)] ?? null;
+        if (!empty($ipRanges) && is_array($ipRanges)) {
+            return IpHelper::ipInAnyCidr($originalIp, $ipRanges);
         }
 
         $valid_host = strtolower($this->allowedBots[$found_bot_key]);
@@ -84,11 +110,44 @@ class CheckIfBotIsReal implements ShouldQueue
             return true;
         }
 
-        $host = strtolower(gethostbyaddr($this->client->ip));
-        $ipAfterLookup = gethostbyname($host);
-
+        // Perform reverse DNS lookup using original IP
+        $host = strtolower(gethostbyaddr($originalIp));
+        
+        // Check if the hostname matches the expected domain
         $hostIsValid = (strpos($host, $valid_host) !== false);
+        if (!$hostIsValid) {
+            return false;
+        }
 
-        return $hostIsValid && $ipAfterLookup === $this->client->ip;
+        // Perform forward DNS lookup
+        $ipAfterLookup = gethostbyname($host);
+        
+        // For IPv4: exact match required
+        if (IpHelper::isIPv4($originalIp)) {
+            return $ipAfterLookup === $originalIp;
+        }
+        
+        // For IPv6: the forward DNS might return a different IP within the same prefix
+        // (e.g., large bots may use multiple IPs within their allocated prefix)
+        if (IpHelper::isIPv6($originalIp)) {
+            // First, try exact match
+            if ($ipAfterLookup === $originalIp) {
+                return true;
+            }
+            
+            // If forward DNS returned an IPv6, check if it's in the same prefix
+            if (IpHelper::isIPv6($ipAfterLookup)) {
+                $prefixLength = $this->options->ipv6_prefix_length ?? 64;
+                return IpHelper::isSameIPv6Prefix($originalIp, $ipAfterLookup, $prefixLength);
+            }
+            
+            // Forward DNS returned IPv4 for an IPv6 request - this is unusual
+            // Some hosts have both A and AAAA records, so we allow it if hostIsValid
+            return true;
+        }
+
+        // Fallback: exact match for any other case
+        return $ipAfterLookup === $originalIp;
     }
 }
+
