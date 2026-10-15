@@ -193,7 +193,7 @@ Choose based on your typical user base. The default `/64` is appropriate for mos
 ## Dependencies
 
 - **PHP**: ^7.1 | ^8.0 - ^8.4
-- **Laravel Framework**: ^5.5 - ^12.0
+- **Laravel Framework**: ^5.5 - ^13.0
 - **Redis**: Required for all data storage (via `predis/predis`)
 - **Guzzle**: For ipinfo.io API calls
 
