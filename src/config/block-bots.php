@@ -102,7 +102,7 @@ return [
         'exabot' => 'exabot',
         'facebook' => 'facebook',
         'google' => 'google',
-        'msn' => 'msn',
+        'msn' => 'msn.com',
         'msnbot' => 'msn.com',
         'sogou' => 'sogou',
         'soso' => 'soso',
