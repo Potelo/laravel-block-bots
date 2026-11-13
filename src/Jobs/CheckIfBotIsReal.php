@@ -40,6 +40,13 @@ class CheckIfBotIsReal implements ShouldQueue
      */
     public function handle()
     {
+        // Jobs queued before an upgrade must not repopulate permanent verification sets.
+        if (app(\Potelo\LaravelBlockBots\Services\BotIpResolver::class)
+            ->match((string) $this->client->userAgent) !== null) {
+            Redis::srem($this->options->pending_bot_list_key, $this->client->trackableIp ?? $this->client->ip);
+            return;
+        }
+
         $found_bot_key = null;
 
         foreach (array_keys($this->allowedBots) as $bot) {
@@ -81,9 +88,7 @@ class CheckIfBotIsReal implements ShouldQueue
     /**
      * Validate if the bot is legitimate using reverse DNS verification.
      *
-     * For IPv6 addresses, this uses the original IP for DNS lookups but
-     * compares the result considering that the forward DNS might return
-     * a different IP within the same prefix.
+     * Forward DNS must resolve to the original address, including IPv6.
      *
      * @param string $found_bot_key
      * @return bool
@@ -111,43 +116,48 @@ class CheckIfBotIsReal implements ShouldQueue
         }
 
         // Perform reverse DNS lookup using original IP
-        $host = strtolower(gethostbyaddr($originalIp));
+        $host = rtrim(strtolower($this->resolveHostname($originalIp)), '.');
         
         // Check if the hostname matches the expected domain
-        $hostIsValid = (strpos($host, $valid_host) !== false);
+        $valid_host = rtrim($valid_host, '.');
+        $hostIsValid = strpos($valid_host, '.') !== false
+            ? ($host === $valid_host || substr($host, -strlen('.' . $valid_host)) === '.' . $valid_host)
+            : strpos($host, $valid_host) !== false;
         if (!$hostIsValid) {
             return false;
         }
 
-        // Perform forward DNS lookup
-        $ipAfterLookup = gethostbyname($host);
-        
-        // For IPv4: exact match required
         if (IpHelper::isIPv4($originalIp)) {
-            return $ipAfterLookup === $originalIp;
+            return $this->resolveIpv4($host) === $originalIp;
         }
-        
-        // For IPv6: the forward DNS might return a different IP within the same prefix
-        // (e.g., large bots may use multiple IPs within their allocated prefix)
-        if (IpHelper::isIPv6($originalIp)) {
-            // First, try exact match
-            if ($ipAfterLookup === $originalIp) {
+
+        foreach ($this->resolveIpv6($host) as $ip) {
+            if (inet_pton($ip) === inet_pton($originalIp)) {
                 return true;
             }
-            
-            // If forward DNS returned an IPv6, check if it's in the same prefix
-            if (IpHelper::isIPv6($ipAfterLookup)) {
-                $prefixLength = $this->options->ipv6_prefix_length ?? 64;
-                return IpHelper::isSameIPv6Prefix($originalIp, $ipAfterLookup, $prefixLength);
-            }
-            
-            // Forward DNS returned IPv4 for an IPv6 request - this is unusual
-            // Some hosts have both A and AAAA records, so we allow it if hostIsValid
-            return true;
         }
 
-        // Fallback: exact match for any other case
-        return $ipAfterLookup === $originalIp;
+        return false;
+    }
+
+    protected function resolveHostname($ip)
+    {
+        return gethostbyaddr($ip);
+    }
+
+    protected function resolveIpv4($host)
+    {
+        return gethostbyname($host);
+    }
+
+    protected function resolveIpv6($host)
+    {
+        $records = dns_get_record($host, DNS_AAAA);
+        if ($records === false) {
+            // Transient DNS failures must not permanently classify a bot as fake.
+            throw new \RuntimeException('Unable to resolve AAAA records for ' . $host);
+        }
+
+        return array_column($records, 'ipv6');
     }
 }
-

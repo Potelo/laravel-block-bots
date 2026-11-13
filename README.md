@@ -14,7 +14,7 @@ Laravel Block bots is a package that blocks bad crawlers, people trying to scrap
 - Verify Crawlers using reverse DNS
 - Highly configurable
 - Redirect users to a page when they got blocked
-- Allow Logged users to always bypass blocks
+- Apply configurable limits to authenticated users
 - **Native IPv6 support** with prefix-based rate limiting
 
 ## Install
@@ -119,7 +119,9 @@ The package also handles legitimate bots (like GoogleBot) that use IPv6:
 - Trackable prefix is used for whitelisting
 - Once verified, all IPs within the bot's prefix are automatically allowed
 
-This ensures legitimate crawlers are never blocked while still rate limiting potential abusers.
+Forward DNS must contain the exact original IPv6 address (AAAA record); another
+address in the same prefix is insufficient. A failed verification removes the
+unlimited bot exemption; normal rate limits still apply.
 
 ## Change log
 
@@ -144,3 +146,124 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 [link-downloads]: https://packagist.org/packages/potelo/laravel-block-bots
 [link-author]: https://github.com/potelo
 
+
+### Dynamic bot IP ranges
+
+The default configuration includes a runtime provider alongside static ranges:
+
+```php
+'allowed_bots_by_ip' => [
+    \Potelo\LaravelBlockBots\Services\BotIpProvider::class,
+    'claudebot' => ['160.79.104.0/21'],
+    // 'gptbot' => [], // Explicitly disable this bot's exemption.
+],
+```
+
+`BotIpProvider` includes GPTBot, ChatGPT-User, OAI-SearchBot and DuckAssistBot.
+Its built-in snapshots are used until each feed is fetched successfully. Successful
+feeds replace the defaults entirely; later failures preserve the last successful
+snapshot indefinitely. Refreshes write only to Redis, never to tracked files.
+Static bot arrays always override provider results, regardless of their order.
+Only an explicitly configured empty static array disables an exemption; empty
+remote feeds are errors. IP-managed bots do not need an `allowed_bots` entry.
+
+Optional configuration (URLs and defaults can be overridden or new bots added):
+
+```php
+'bot_ip_provider' => [
+    'schedule_enabled' => true,
+    'refresh_days' => 15,
+    'redis_prefix' => 'block_bot:ip_sources:',
+    'bots' => [
+        'mybot' => [
+            'url' => 'https://example.com/bot.json',
+            'defaults' => ['192.0.2.0/24'],
+        ],
+    ],
+],
+```
+
+Feeds must return HTTP 200 and JSON with nonempty `prefixes`, containing valid
+`ipv4Prefix` and/or `ipv6Prefix` CIDRs. Invalid entries reject the entire response.
+Only HTTPS endpoints are supported; redirects are rejected. Use trusted URLs.
+The service class name and settings remain safe for `config:cache`; live ranges
+are read from Redis at runtime.
+
+The package automatically registers a daily scheduler check. Run Laravel's
+scheduler and **an asynchronous queue worker** in the consuming application.
+Each source becomes due 15 days after its last successful fetch; new sources are
+due immediately. Failed sources retry five additional times, after 1 minute,
+5 minutes, 30 minutes, 2 hours and 12 hours. After exhaustion the next daily check
+starts a new cycle. A Redis lease prevents duplicate cycles across servers;
+abandoned cycles become eligible again after its two-day expiry. Use a queue
+backend that supports 12-hour delays (for example Redis or database, not SQS).
+
+```bash
+# Queue immediate refreshes, including recently updated sources:
+php artisan block-bots:refresh-ips
+
+# Queue only new or due sources (also invoked by the scheduler):
+php artisan block-bots:refresh-ips --due
+```
+
+#### Verification behavior and upgrade notes
+
+Normal guest rules and rate limits still run first. When the bot exemption is
+needed, IP rules use the **original IP**, not the normalized IPv6 prefix, and run
+before the shared whitelist/fake-bot sets. IP-managed bots are no longer admitted
+while awaiting asynchronous DNS checks, nor do they populate permanent verification
+sets. Existing queued DNS jobs for these bots exit without writing results.
+
+Previously cached whitelist/fake-bot decisions are ignored for IP-managed requests;
+no blanket deletion of shared Redis sets is performed because those sets do not
+record which bot created each entry. Consequently, a removed range immediately
+loses its bot exemption and a newly added range can be reconsidered on the next
+request. Old shared entries retain their existing behavior for other traffic.
+This also applies to static IP rules, including explicit empty overrides.
+
+If the application already published `config/block-bots.php`, replace the four
+moved static bot entries with `BotIpProvider::class` to enable dynamic updates.
+Leaving a static entry in the published configuration intentionally overrides that
+bot's provider ranges. Restart long-running queue workers after deployment.
+
+
+### Rate-limit responses
+
+Unknown bots and bots that fail verification retain the normal request limit.
+Requests denied above that limit receive **429** with `Retry-After` in seconds,
+read from the actual hit counter's Redis TTL. This includes authenticated users.
+The header is omitted when there is no positive TTL. Custom rule denials and
+`mode=always` retain 429; they only get this header when the limit is exceeded.
+
+The existing `json_response` and HTML view remain unchanged. Applications
+overriding `notAllowed()` must add the header to their custom responses.
+
+### DNS verification upgrade and deployment
+
+Configured hostname values containing a dot must match the whole PTR hostname
+or a subdomain suffix: `msn.com` accepts `crawler.search.msn.com`, but rejects
+`msn.com.attacker.test`. Values without dots retain substring matching and its
+limitations; `*` retains its existing behavior. The default `msn` entry now uses
+`msn.com`. IPv4 retains exact forward-address matching; IPv6 now requires an
+exact AAAA address, comparing binary addresses to handle equivalent spellings.
+DNS lookup errors propagate without adding the address to the fake-bot set;
+the pending entry has been removed so a later request can enqueue another check.
+
+**Clear the existing whitelist after deploying the stricter verifier.** Otherwise
+entries approved by the old rules keep their exemption. Before clearing,
+evaluate the number of entries (`SCARD` on the configured whitelist key), active
+bot traffic, queue backlog, worker capacity, and DNS latency. Expect a temporary
+increase in reverse and forward DNS lookups as active bots are reverified.
+Use an asynchronous queue and choose a lower-traffic deployment window.
+
+1. Update published configuration, especially `allowed_bots.msn` to `msn.com`.
+2. Rebuild configuration caches and restart queue workers on the new code.
+   Ensure old-version workers cannot repopulate the whitelist.
+3. Run `php artisan block-bots:clear-whitelist`.
+4. Monitor verification volume, queue latency/failures, DNS errors and 429 rates.
+
+The default middleware admits recognized DNS bots while verification is pending.
+Applications requiring completed verification may temporarily return 429 to
+legitimate crawlers until their jobs finish. Static whitelist IPs are restored
+on evaluation; IP-range exemptions do not depend on this whitelist.
+The package does not clear production data automatically.
