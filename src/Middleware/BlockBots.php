@@ -16,8 +16,6 @@ use Potelo\LaravelBlockBots\Events\BotBlockedEvent;
 class BlockBots extends AbstractBlockBots
 {
 
-    protected $explicitlyBlocked = false;
-
     /**
      * Executes the middleware
      *
@@ -29,7 +27,6 @@ class BlockBots extends AbstractBlockBots
      */
     public function handle($request, Closure $next, $limit = 100, $frequency = 'daily')
     {
-        $this->explicitlyBlocked = false;
         $this->setUp($request, $limit, $frequency);
         $this->beforeHandle();
 
@@ -38,11 +35,6 @@ class BlockBots extends AbstractBlockBots
         }
 
         $this->hits = $this->client->countHits($this->incrementHits, $frequency);
-
-        if ($this->options->mode !== 'never' && $this->isExplicitlyBlockedBot()) {
-            $this->explicitlyBlocked = true;
-            return $this->notAllowed();
-        }
 
         return $this->isAllowed() ? $next($request) : $this->notAllowed();
     }
@@ -68,9 +60,8 @@ class BlockBots extends AbstractBlockBots
             event(new BotBlockedEvent($this->client->ip, $this->hits, Carbon::now()));
         }
 
-        $status = $this->explicitlyBlocked ? 403 : 429;
         $headers = [];
-        if (!$this->explicitlyBlocked && $this->isLimitExceeded()) {
+        if ($this->isLimitExceeded()) {
             $ttl = (int) Redis::ttl($this->client->key);
             if ($ttl > 0) {
                 $headers['Retry-After'] = $ttl;
@@ -78,28 +69,10 @@ class BlockBots extends AbstractBlockBots
         }
 
         if ($this->request->expectsJson()) {
-            $body = $this->explicitlyBlocked
-                ? ['message' => $this->options->blocked_bot_message]
-                : $this->options->json_response;
-
-            return response()->json($body, $status, $headers);
+            return response()->json($this->options->json_response, 429, $headers);
         }
 
-        return response(view('block-bots::error', [
-            'message' => $this->explicitlyBlocked ? $this->options->blocked_bot_message : null,
-        ]), $status, $headers);
-    }
-
-    protected function isExplicitlyBlockedBot()
-    {
-        foreach ((array) $this->options->blocked_bots as $bot) {
-            if (is_string($bot) && $bot !== ''
-                && stripos((string) $this->client->userAgent, $bot) !== false) {
-                return true;
-            }
-        }
-
-        return false;
+        return response(view('block-bots::error'), 429, $headers);
     }
 
     /**
