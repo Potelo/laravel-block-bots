@@ -14,7 +14,7 @@ Laravel Block bots is a package that blocks bad crawlers, people trying to scrap
 - Verify Crawlers using reverse DNS
 - Highly configurable
 - Redirect users to a page when they got blocked
-- Apply configurable limits to authenticated users; explicit bot denials also apply
+- Apply configurable limits to authenticated users
 - **Native IPv6 support** with prefix-based rate limiting
 
 ## Install
@@ -121,7 +121,7 @@ The package also handles legitimate bots (like GoogleBot) that use IPv6:
 
 Forward DNS must contain the exact original IPv6 address (AAAA record); another
 address in the same prefix is insufficient. A failed verification removes the
-unlimited bot exemption but does not produce an explicit 403 denial.
+unlimited bot exemption; normal rate limits still apply.
 
 ## Change log
 
@@ -227,30 +227,16 @@ Leaving a static entry in the published configuration intentionally overrides th
 bot's provider ranges. Restart long-running queue workers after deployment.
 
 
-### Explicit bot denials and rate-limit responses
-
-Configure case-insensitive User-Agent fragments in `config/block-bots.php`:
-
-```php
-'blocked_bots' => ['baiduspider'],
-'blocked_bot_message' => 'Acesso negado.',
-```
-
-The default deny list is empty. Matching bots receive **403**, from their first
-request, including authenticated requests and whitelisted IPs. Explicit denials
-take precedence over DNS/IP exemptions. Empty fragments are ignored.
-Disabling the middleware or selecting `mode=never` bypasses these denials.
+### Rate-limit responses
 
 Unknown bots and bots that fail verification retain the normal request limit.
 Requests denied above that limit receive **429** with `Retry-After` in seconds,
 read from the actual hit counter's Redis TTL. This includes authenticated users.
 The header is omitted when there is no positive TTL. Custom rule denials and
 `mode=always` retain 429; they only get this header when the limit is exceeded.
-Explicit 403 responses never include it.
 
-The explicit-denial message is shared by JSON and the package HTML view.
-The existing `json_response` remains the body for 429 responses. Applications
-overriding `notAllowed()` or publishing their own view must adapt their responses.
+The existing `json_response` and HTML view remain unchanged. Applications
+overriding `notAllowed()` must add the header to their custom responses.
 
 ### DNS verification upgrade and deployment
 
@@ -270,8 +256,7 @@ bot traffic, queue backlog, worker capacity, and DNS latency. Expect a temporary
 increase in reverse and forward DNS lookups as active bots are reverified.
 Use an asynchronous queue and choose a lower-traffic deployment window.
 
-1. Update published configuration, especially `allowed_bots.msn` to `msn.com`,
-   and merge the new optional denial settings.
+1. Update published configuration, especially `allowed_bots.msn` to `msn.com`.
 2. Rebuild configuration caches and restart queue workers on the new code.
    Ensure old-version workers cannot repopulate the whitelist.
 3. Run `php artisan block-bots:clear-whitelist`.
