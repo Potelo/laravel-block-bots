@@ -18,6 +18,8 @@ namespace Potelo\LaravelBlockBots\Contracts;
  * @property string[] $channels_blocks
  * @property bool $log
  * @property bool $log_only_guest
+ * @property string[] $blocked_bots
+ * @property string $blocked_bot_message
  * @property string[] $allowed_bots
  * @property string[] $json_response
  * @property string[] $timezone

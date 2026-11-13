@@ -85,6 +85,12 @@ return [
      * For bots that support reverse DNS verification, use the expected hostname.
      * For bots without DNS verification or IP lists, use '*' to allow all IPs with that user-agent.
      */
+    // Case-insensitive User-Agent fragments. Explicit denials override all exemptions.
+    'blocked_bots' => [],
+
+    // Shared message for explicit denials in JSON and HTML responses.
+    'blocked_bot_message' => 'Acesso negado.',
+
     'allowed_bots' => [
         'ahrefs' => 'ahrefs',
         'applebot' => 'apple',

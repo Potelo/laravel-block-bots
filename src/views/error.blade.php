@@ -49,7 +49,7 @@
 <div class="flex-center position-ref full-height">
     <div class="content">
         <div class="title">
-            You are over the specified limit.
+            {{ $message ?? 'You are over the specified limit.' }}
         </div>
     </div>
 </div>
