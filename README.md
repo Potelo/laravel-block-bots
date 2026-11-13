@@ -144,3 +144,82 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 [link-downloads]: https://packagist.org/packages/potelo/laravel-block-bots
 [link-author]: https://github.com/potelo
 
+
+### Dynamic bot IP ranges
+
+The default configuration includes a runtime provider alongside static ranges:
+
+```php
+'allowed_bots_by_ip' => [
+    \Potelo\LaravelBlockBots\Services\BotIpProvider::class,
+    'claudebot' => ['160.79.104.0/21'],
+    // 'gptbot' => [], // Explicitly disable this bot's exemption.
+],
+```
+
+`BotIpProvider` includes GPTBot, ChatGPT-User, OAI-SearchBot and DuckAssistBot.
+Its built-in snapshots are used until each feed is fetched successfully. Successful
+feeds replace the defaults entirely; later failures preserve the last successful
+snapshot indefinitely. Refreshes write only to Redis, never to tracked files.
+Static bot arrays always override provider results, regardless of their order.
+Only an explicitly configured empty static array disables an exemption; empty
+remote feeds are errors. IP-managed bots do not need an `allowed_bots` entry.
+
+Optional configuration (URLs and defaults can be overridden or new bots added):
+
+```php
+'bot_ip_provider' => [
+    'schedule_enabled' => true,
+    'refresh_days' => 15,
+    'redis_prefix' => 'block_bot:ip_sources:',
+    'bots' => [
+        'mybot' => [
+            'url' => 'https://example.com/bot.json',
+            'defaults' => ['192.0.2.0/24'],
+        ],
+    ],
+],
+```
+
+Feeds must return HTTP 200 and JSON with nonempty `prefixes`, containing valid
+`ipv4Prefix` and/or `ipv6Prefix` CIDRs. Invalid entries reject the entire response.
+Only HTTPS endpoints are supported; redirects are rejected. Use trusted URLs.
+The service class name and settings remain safe for `config:cache`; live ranges
+are read from Redis at runtime.
+
+The package automatically registers a daily scheduler check. Run Laravel's
+scheduler and **an asynchronous queue worker** in the consuming application.
+Each source becomes due 15 days after its last successful fetch; new sources are
+due immediately. Failed sources retry five additional times, after 1 minute,
+5 minutes, 30 minutes, 2 hours and 12 hours. After exhaustion the next daily check
+starts a new cycle. A Redis lease prevents duplicate cycles across servers;
+abandoned cycles become eligible again after its two-day expiry. Use a queue
+backend that supports 12-hour delays (for example Redis or database, not SQS).
+
+```bash
+# Queue immediate refreshes, including recently updated sources:
+php artisan block-bots:refresh-ips
+
+# Queue only new or due sources (also invoked by the scheduler):
+php artisan block-bots:refresh-ips --due
+```
+
+#### Verification behavior and upgrade notes
+
+Normal guest rules and rate limits still run first. When the bot exemption is
+needed, IP rules use the **original IP**, not the normalized IPv6 prefix, and run
+before the shared whitelist/fake-bot sets. IP-managed bots are no longer admitted
+while awaiting asynchronous DNS checks, nor do they populate permanent verification
+sets. Existing queued DNS jobs for these bots exit without writing results.
+
+Previously cached whitelist/fake-bot decisions are ignored for IP-managed requests;
+no blanket deletion of shared Redis sets is performed because those sets do not
+record which bot created each entry. Consequently, a removed range immediately
+loses its bot exemption and a newly added range can be reconsidered on the next
+request. Old shared entries retain their existing behavior for other traffic.
+This also applies to static IP rules, including explicit empty overrides.
+
+If the application already published `config/block-bots.php`, replace the four
+moved static bot entries with `BotIpProvider::class` to enable dynamic updates.
+Leaving a static entry in the published configuration intentionally overrides that
+bot's provider ranges. Restart long-running queue workers after deployment.
