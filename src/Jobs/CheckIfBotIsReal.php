@@ -40,6 +40,13 @@ class CheckIfBotIsReal implements ShouldQueue
      */
     public function handle()
     {
+        // Jobs queued before an upgrade must not repopulate permanent verification sets.
+        if (app(\Potelo\LaravelBlockBots\Services\BotIpResolver::class)
+            ->match((string) $this->client->userAgent) !== null) {
+            Redis::srem($this->options->pending_bot_list_key, $this->client->trackableIp ?? $this->client->ip);
+            return;
+        }
+
         $found_bot_key = null;
 
         foreach (array_keys($this->allowedBots) as $bot) {
