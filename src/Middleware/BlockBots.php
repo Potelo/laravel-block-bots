@@ -188,6 +188,15 @@ class BlockBots extends AbstractBlockBots
                 return false;
             }
         }
+        // IP rules are authoritative, including an explicit empty static array.
+        // Never reuse prefix-wide verification results for IP-managed bots.
+        $ranges = app(\Potelo\LaravelBlockBots\Services\BotIpResolver::class)
+            ->match((string) $this->client->userAgent);
+        if ($ranges !== null) {
+            return filter_var($this->client->ip, FILTER_VALIDATE_IP) !== false
+                && \Potelo\LaravelBlockBots\Helpers\IpHelper::ipInAnyCidr($this->client->ip, $ranges);
+        }
+
         //We fast-track allowed IPs
         if ($this->isWhitelisted()) {
             return true;
