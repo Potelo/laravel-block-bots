@@ -212,6 +212,7 @@ before the shared whitelist/fake-bot sets. IP-managed bots are no longer admitte
 while awaiting asynchronous DNS checks, nor do they populate permanent verification
 sets. Existing queued DNS jobs for these bots exit without writing results.
 
+Explicit `whitelist_ips` entries still grant access for IP-managed bots.
 Previously cached whitelist/fake-bot decisions are ignored for IP-managed requests;
 no blanket deletion of shared Redis sets is performed because those sets do not
 record which bot created each entry. Consequently, a removed range immediately
@@ -223,3 +224,8 @@ If the application already published `config/block-bots.php`, replace the four
 moved static bot entries with `BotIpProvider::class` to enable dynamic updates.
 Leaving a static entry in the published configuration intentionally overrides that
 bot's provider ranges. Restart long-running queue workers after deployment.
+
+If upgrading from a version of the provider that used untagged Redis keys,
+run `php artisan block-bots:refresh-ips` after restarting the workers. Refreshes
+populate the new keys. Built-in or configured defaults apply until each refresh
+succeeds.

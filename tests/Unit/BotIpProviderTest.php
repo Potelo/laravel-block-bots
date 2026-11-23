@@ -19,6 +19,7 @@ use Potelo\LaravelBlockBots\Middleware\BlockBots;
 use Potelo\LaravelBlockBots\Services\BotIpProvider;
 use Potelo\LaravelBlockBots\Services\BotIpResolver;
 use Potelo\LaravelBlockBots\Tests\TestCase;
+use Predis\Cluster\RedisStrategy;
 
 class BotIpProviderTest extends TestCase
 {
@@ -92,6 +93,48 @@ class BotIpProviderTest extends TestCase
         $this->assertTrue($this->allowed('2001:db8::1'));
         $this->assertFalse($this->allowed('2001:db8::2'));
         $this->assertTrue($this->allowed('2001:db8::2', 'GPTBot', 100));
+    }
+
+    public function test_explicit_whitelist_applies_to_managed_bots_without_caching_the_prefix()
+    {
+        config([
+            'block-bots.whitelist_ips' => ['192.0.2.0/24', '2001:db8::1/128'],
+            'block-bots.allowed_bots_by_ip' => ['gptbot' => []],
+        ]);
+        Redis::sadd(config('block-bots.fake_bot_list_key'), '192.0.2.1');
+
+        $this->assertTrue($this->allowed('192.0.2.1'));
+        $this->assertTrue($this->allowed('2001:db8::1'));
+        $this->assertFalse($this->allowed('2001:db8::2'));
+        $this->assertFalse(Redis::sismember(config('block-bots.whitelist_key'), '2001:db8::'));
+    }
+
+    public function test_resolver_reads_only_the_selected_dynamic_snapshot()
+    {
+        $provider = new BotIpProvider();
+        $resolver = new BotIpResolver();
+        config(['block-bots.allowed_bots_by_ip' => [BotIpProvider::class, 'bot' => []]]);
+        Redis::shouldReceive('get')->once()->with($provider->key('gptbot'))
+            ->andReturn(json_encode(['ranges' => ['192.0.2.0/24']]));
+
+        $this->assertNull($resolver->match('Mozilla'));
+        $this->assertSame([], $resolver->match('OtherBot'));
+        $this->assertTrue($resolver->manages('GPTBot'));
+        $this->assertSame(['192.0.2.0/24'], $resolver->match('GPTBot'));
+    }
+
+    public function test_snapshot_and_lease_use_the_same_redis_cluster_slot()
+    {
+        $provider = new BotIpProvider();
+        $strategy = new RedisStrategy();
+        $slots = [];
+        foreach (array_keys($provider->sources()) as $bot) {
+            $key = $provider->key($bot);
+            $slots[] = $strategy->getSlotByKey($key);
+            $this->assertSame($strategy->getSlotByKey($key), $strategy->getSlotByKey($key . ':lock'));
+        }
+
+        $this->assertCount(count($slots), array_unique($slots));
     }
 
     public function test_new_bot_is_eligible_and_due_immediately()

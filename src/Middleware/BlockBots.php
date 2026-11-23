@@ -125,14 +125,7 @@ class BlockBots extends AbstractBlockBots
             return true;
         }
 
-        $ips = $this->options->whitelist_ips;
-
-        if (is_null($this->client->ip)) {
-            return false;
-        }
-
-        // Use original IP for CIDR matching (IpUtils handles both IPv4 and IPv6 CIDR)
-        if (IpUtils::checkIp($this->client->ip, $ips)) {
+        if ($this->isExplicitlyWhitelisted()) {
             // Add trackable IP to Redis whitelist for faster future checks
             Redis::sadd($this->options->whitelist_key, $this->client->trackableIp);
             if ($this->options->log) {
@@ -142,6 +135,12 @@ class BlockBots extends AbstractBlockBots
         }
 
         return false;
+    }
+
+    private function isExplicitlyWhitelisted(): bool
+    {
+        return $this->client->ip !== null
+            && IpUtils::checkIp($this->client->ip, $this->options->whitelist_ips);
     }
 
 
@@ -193,8 +192,9 @@ class BlockBots extends AbstractBlockBots
         $ranges = app(\Potelo\LaravelBlockBots\Services\BotIpResolver::class)
             ->match((string) $this->client->userAgent);
         if ($ranges !== null) {
-            return filter_var($this->client->ip, FILTER_VALIDATE_IP) !== false
-                && \Potelo\LaravelBlockBots\Helpers\IpHelper::ipInAnyCidr($this->client->ip, $ranges);
+            return $this->isExplicitlyWhitelisted()
+                || (filter_var($this->client->ip, FILTER_VALIDATE_IP) !== false
+                    && \Potelo\LaravelBlockBots\Helpers\IpHelper::ipInAnyCidr($this->client->ip, $ranges));
         }
 
         //We fast-track allowed IPs

@@ -30,7 +30,8 @@ class BotIpProvider
 
     public function key(string $bot): string
     {
-        return config('block-bots.bot_ip_provider.redis_prefix', 'block_bot:ip_sources:') . $bot;
+        return config('block-bots.bot_ip_provider.redis_prefix', 'block_bot:ip_sources:')
+            . '{bot:' . rawurlencode($bot) . '}';
     }
 
     public function snapshot(string $bot): ?array

@@ -18,25 +18,54 @@ class BotIpResolver
     public function ranges(): array
     {
         $ranges = [];
-        foreach ($this->providers() as $provider) {
-            $ranges = array_merge($ranges, $provider->getRanges());
-        }
-        foreach (config('block-bots.allowed_bots_by_ip', []) as $bot => $entry) {
-            if (is_string($bot) && is_array($entry)) {
-                $ranges[strtolower($bot)] = $entry;
-            }
+        foreach ($this->rules() as $bot => $rule) {
+            $ranges[$bot] = is_array($rule) ? $rule : $rule->ranges($bot);
         }
         return $ranges;
     }
 
+    private function rules(): array
+    {
+        $rules = [];
+        foreach ($this->providers() as $provider) {
+            foreach ($provider->sources() as $bot => $source) {
+                $rules[$bot] = $provider;
+            }
+        }
+        foreach (config('block-bots.allowed_bots_by_ip', []) as $bot => $entry) {
+            if (is_string($bot) && is_array($entry)) {
+                $rules[strtolower($bot)] = $entry;
+            }
+        }
+        return $rules;
+    }
+
     public function match(string $userAgent): ?array
     {
-        $ranges = $this->ranges();
+        $rules = $this->rules();
+        $bot = $this->matchingBot($userAgent, $rules);
+        if ($bot === null) {
+            return null;
+        }
+
+        $rule = $rules[$bot];
+        return is_array($rule) ? $rule : $rule->ranges($bot);
+    }
+
+    public function manages(string $userAgent): bool
+    {
+        return $this->matchingBot($userAgent, $this->rules()) !== null;
+    }
+
+    private function matchingBot(string $userAgent, array $rules): ?string
+    {
         // Prefer specific bot names when configured keywords overlap.
-        uksort($ranges, function ($a, $b) { return strlen($b) <=> strlen($a); });
-        foreach ($ranges as $bot => $cidrs) {
-            if ($bot !== '' && stripos($userAgent, $bot) !== false) {
-                return $cidrs;
+        uksort($rules, function ($a, $b) {
+            return strlen($b) <=> strlen($a);
+        });
+        foreach (array_keys($rules) as $bot) {
+            if ($bot !== '' && stripos($userAgent, (string) $bot) !== false) {
+                return (string) $bot;
             }
         }
         return null;
