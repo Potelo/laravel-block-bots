@@ -93,8 +93,13 @@ class BotIpProvider
         if (!$source || strtolower(parse_url($source['url'] ?? '', PHP_URL_SCHEME) ?? '') !== 'https') {
             throw new \InvalidArgumentException('Bot feed must have a configured HTTPS URL: ' . $bot);
         }
-        $response = app(Client::class)->get($source['url'], [
-            'connect_timeout' => 5, 'timeout' => 20, 'allow_redirects' => false,
+        // http_errors=false: every non-200 status goes through the check below instead of Guzzle exceptions.
+        $response = app(Client::class)->request('GET', $source['url'], [
+            'connect_timeout' => 5,
+            'timeout' => 20,
+            'allow_redirects' => false,
+            'http_errors' => false,
+            'headers' => ['Accept' => 'application/json'],
         ]);
         if ($response->getStatusCode() !== 200) {
             throw new \UnexpectedValueException('Bot feed did not return HTTP 200: ' . $bot);
