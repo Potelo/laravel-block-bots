@@ -207,8 +207,12 @@ php artisan block-bots:refresh-ips --due
 When changing a bot's feed URL, rebuild the configuration cache if the
 application uses one, restart the queue workers, and run
 `php artisan block-bots:refresh-ips` without `--due`. This queues a refresh for
-all configured sources, including those with recent snapshots. The bot keeps
-using its previous snapshot until a worker successfully fetches the new feed.
+each configured source without an active lease, including sources with recent
+snapshots. If a source already has an active lease, its existing cycle can fetch
+the new URL once the restarted worker picks up the job. If you still need to
+force a refresh, run the command again after the lease is released or expires.
+The bot keeps using its previous snapshot until a worker successfully fetches
+the new feed.
 
 #### Verification behavior and upgrade notes
 
