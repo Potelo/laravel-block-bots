@@ -151,6 +151,22 @@ class BotIpProviderTest extends TestCase
         $this->assertSame(['192.0.2.0/24'], $resolver->match('GPTBot'));
     }
 
+    public function test_resolver_lists_configured_bots_without_reading_snapshots()
+    {
+        config([
+            'block-bots.allowed_bots_by_ip' => [BotIpProvider::class, 'StaticBot' => ['192.0.2.0/24'], 'gptbot' => []],
+            'block-bots.bot_ip_provider.bots' => ['gptbot' => [], 'OtherFeedBot' => []],
+        ]);
+        Redis::shouldReceive('get')->never();
+
+        $bots = (new BotIpResolver())->bots();
+        sort($bots);
+        $this->assertSame(['gptbot', 'otherfeedbot', 'staticbot'], $bots);
+
+        config(['block-bots.allowed_bots_by_ip' => ['staticbot' => []]]);
+        $this->assertSame(['staticbot'], (new BotIpResolver())->bots());
+    }
+
     public function test_snapshot_and_lease_use_the_same_redis_cluster_slot()
     {
         $provider = new BotIpProvider();

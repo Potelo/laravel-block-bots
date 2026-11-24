@@ -31,6 +31,8 @@ All notable changes to `laravel-block-bots` are documented in this file.
   with a lease-protected refresh and retries.
 - `block-bots:refresh-ips` command (`--due` refreshes only new or expired sources)
   and an automatic daily scheduler entry (`bot_ip_provider.schedule_enabled`).
+- `BotIpResolver::bots()`: lists the configured IP-managed bot keywords (provider
+  sources and static arrays) without reading Redis snapshots.
 
 ### Upgrading from 3.x
 

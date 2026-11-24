@@ -15,6 +15,17 @@ class BotIpResolver
         return $providers;
     }
 
+    /**
+     * List the configured bot keywords (provider sources and static arrays)
+     * without reading Redis snapshots.
+     *
+     * @return string[]
+     */
+    public function bots(): array
+    {
+        return array_map('strval', array_keys($this->rules()));
+    }
+
     public function ranges(): array
     {
         $ranges = [];
