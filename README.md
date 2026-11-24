@@ -204,6 +204,12 @@ php artisan block-bots:refresh-ips
 php artisan block-bots:refresh-ips --due
 ```
 
+When changing a bot's feed URL, rebuild the configuration cache if the
+application uses one, restart the queue workers, and run
+`php artisan block-bots:refresh-ips` without `--due`. This queues a refresh for
+all configured sources, including those with recent snapshots. The bot keeps
+using its previous snapshot until a worker successfully fetches the new feed.
+
 #### Verification behavior and upgrade notes
 
 Normal guest rules and rate limits still run first. When the bot exemption is

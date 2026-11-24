@@ -49,7 +49,7 @@ class BotIpProvider
     public function getRanges(): array
     {
         $ranges = [];
-        foreach ($this->sources() as $bot => $source) {
+        foreach (array_keys($this->sources()) as $bot) {
             $ranges[$bot] = $this->ranges($bot);
         }
         return $ranges;
@@ -57,23 +57,37 @@ class BotIpProvider
 
     public function queueRefresh(string $bot, bool $force = false): bool
     {
-        $snapshot = $this->snapshot($bot);
-        $interval = max(1, (int) config('block-bots.bot_ip_provider.refresh_days', 15)) * 86400;
-        if (!$force && $snapshot && $snapshot['updated_at'] + $interval > Carbon::now()->timestamp) {
+        if (!$force && !$this->isRefreshDue($bot)) {
             return false;
         }
+
         $token = bin2hex(random_bytes(16));
         // Hold the lease across all delayed attempts; recover abandoned cycles after two days.
         if (!Redis::set($this->key($bot) . ':lock', $token, 'EX', 172800, 'NX')) {
             return false;
         }
+
         try {
+            // Another cycle may have finished between the first read and acquiring the lease.
+            if (!$force && !$this->isRefreshDue($bot)) {
+                $this->release($bot, $token);
+                return false;
+            }
+
             RefreshBotIpRanges::dispatch($bot, $token);
         } catch (\Throwable $exception) {
             $this->release($bot, $token);
             throw $exception;
         }
         return true;
+    }
+
+    private function isRefreshDue(string $bot): bool
+    {
+        $snapshot = $this->snapshot($bot);
+        $interval = max(1, (int) config('block-bots.bot_ip_provider.refresh_days', 15)) * 86400;
+
+        return !$snapshot || $snapshot['updated_at'] + $interval <= Carbon::now()->timestamp;
     }
 
     public function ownsLease(string $bot, string $token): bool
