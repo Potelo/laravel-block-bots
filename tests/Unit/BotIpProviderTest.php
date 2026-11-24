@@ -221,6 +221,34 @@ class BotIpProviderTest extends TestCase
         }
     }
 
+    public function test_due_check_skips_a_snapshot_refreshed_before_acquiring_the_lease()
+    {
+        $provider = new class extends BotIpProvider {
+            private $firstRead = true;
+
+            public function snapshot(string $bot): ?array
+            {
+                $snapshot = parent::snapshot($bot);
+                if ($this->firstRead) {
+                    $this->firstRead = false;
+                    Redis::set($this->key($bot), json_encode([
+                        'ranges' => ['192.0.2.0/24'],
+                        'updated_at' => Carbon::now()->timestamp,
+                    ]));
+                }
+
+                return $snapshot;
+            }
+        };
+
+        $this->assertFalse($provider->queueRefresh('gptbot'));
+        Queue::assertNotPushed(RefreshBotIpRanges::class);
+        $this->assertSame(0, Redis::exists($provider->key('gptbot') . ':lock'));
+
+        $this->assertTrue($provider->queueRefresh('gptbot', true));
+        Queue::assertPushed(RefreshBotIpRanges::class, 1);
+    }
+
     public function test_expired_cycle_cannot_overwrite_or_unlock_its_successor()
     {
         $provider = new BotIpProvider();
