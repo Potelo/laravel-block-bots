@@ -173,7 +173,9 @@ fetch its feed. Successful feeds replace the defaults entirely; later failures
 preserve the last successful snapshot indefinitely. Refreshes write only to Redis, never to tracked files.
 Static bot arrays always override provider results, regardless of their order.
 Only an explicitly configured empty static array disables an exemption; empty
-remote feeds are errors. IP-managed bots do not need an `allowed_bots` entry.
+remote feeds are errors. With `BLOCK_BOTS_USE_DEFAULT_ALLOWED_BOTS=false`,
+an IP-managed bot must also match the middleware's custom bot list to receive a bot
+exemption. Explicit `whitelist_ips` still apply.
 
 Configuration (add, remove or edit bots; `defaults` is optional):
 

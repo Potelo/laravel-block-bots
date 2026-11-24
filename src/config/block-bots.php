@@ -112,7 +112,7 @@ return [
      * map the user-agent keyword to an array of CIDR ranges.
      *
      * IP rules grant a bot exemption only when the original IP matches a range.
-     * No separate 'allowed_bots' entry or permanent whitelist entry is needed.
+     * When default bots are disabled, the bot must also match the middleware's custom list.
      * Explicit arrays override provider results, including [] to disable an exemption.
      * IP rules are checked directly before shared verification sets; no DNS fallback.
      */

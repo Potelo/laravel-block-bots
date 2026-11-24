@@ -9,6 +9,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Redis;
 use Potelo\LaravelBlockBots\Contracts\Client;
@@ -70,6 +71,33 @@ class BotIpProviderTest extends TestCase
             $this->assertSame([], (new BotIpResolver())->match('GPTBot/1.0'));
             $this->assertFalse($this->allowed('132.196.86.1'));
         }
+    }
+
+    public function test_disabling_default_bots_preserves_custom_and_explicit_whitelist_exemptions()
+    {
+        config([
+            'block-bots.use_default_allowed_bots' => false,
+            'block-bots.whitelist_ips' => ['192.0.2.1'],
+        ]);
+
+        $this->assertFalse($this->allowed('132.196.86.1'));
+        $this->assertFalse($this->allowed('160.79.104.1', 'ClaudeBot'));
+        $this->assertFalse($this->allowed('192.0.2.2', 'Googlebot'));
+        $this->assertTrue($this->allowed('192.0.2.1'));
+
+        $middleware = new class extends BlockBots {
+            public function __construct()
+            {
+                parent::__construct();
+                $this->setAllowedBots(['gptbot' => '*']);
+            }
+        };
+
+        $response = $middleware->handle($this->request('132.196.86.1'), function () { return 'ok'; }, 0);
+        $this->assertSame('ok', $response);
+        $response = $middleware->handle($this->request('192.0.2.2'), function () { return 'ok'; }, 0);
+        $this->assertSame(429, $response->getStatusCode());
+        Queue::assertNotPushed(CheckIfBotIsReal::class);
     }
 
     public function test_configured_defaults_cover_only_the_window_before_the_first_refresh()
@@ -230,6 +258,29 @@ class BotIpProviderTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    public function test_logging_failure_does_not_prevent_retry_or_final_lease_release()
+    {
+        $provider = new BotIpProvider();
+        $this->http([new Response(503), new Response(503)]);
+        $this->assertTrue($provider->queueRefresh('gptbot'));
+        $token = Redis::get($provider->key('gptbot') . ':lock');
+        Log::shouldReceive('warning')->twice()->andThrow(new \RuntimeException('Logger unavailable'));
+
+        foreach ([0, count(RefreshBotIpRanges::RETRY_DELAYS)] as $attempt) {
+            try {
+                (new RefreshBotIpRanges('gptbot', $token, $attempt))->handle($provider);
+                $this->fail('Expected the logger exception.');
+            } catch (\RuntimeException $exception) {
+                $this->assertSame('Logger unavailable', $exception->getMessage());
+            }
+        }
+
+        Queue::assertPushed(RefreshBotIpRanges::class, function ($job) use ($token) {
+            return $job->token === $token && $job->attempt === 1 && $job->delay !== null;
+        });
+        $this->assertFalse($provider->ownsLease('gptbot', $token));
     }
 
     public function test_old_verification_job_cannot_repopulate_global_sets()

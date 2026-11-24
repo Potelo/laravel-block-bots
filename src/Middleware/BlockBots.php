@@ -95,6 +95,10 @@ class BlockBots extends AbstractBlockBots
     private function isAllowedBot()
     {
         $allowedBotsKeys = array_keys($this->getAllowedBots());
+        if ($allowedBotsKeys === []) {
+            return false;
+        }
+
         $userAgent = strtolower($this->client->userAgent);
         $pattern = strtolower('(' . implode('|', $allowedBotsKeys) . ')');
 
@@ -193,7 +197,8 @@ class BlockBots extends AbstractBlockBots
             ->match((string) $this->client->userAgent);
         if ($ranges !== null) {
             return $this->isExplicitlyWhitelisted()
-                || (filter_var($this->client->ip, FILTER_VALIDATE_IP) !== false
+                || (($this->options->use_default_allowed_bots || $this->isAllowedBot())
+                    && filter_var($this->client->ip, FILTER_VALIDATE_IP) !== false
                     && \Potelo\LaravelBlockBots\Helpers\IpHelper::ipInAnyCidr($this->client->ip, $ranges));
         }
 

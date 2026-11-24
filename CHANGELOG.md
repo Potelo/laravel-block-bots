@@ -15,8 +15,9 @@ All notable changes to `laravel-block-bots` are documented in this file.
   writing results.
 - **IP-managed bots no longer need an `allowed_bots` entry.** GPTBot,
   ChatGPT-User, OAI-SearchBot, DuckAssistBot and ClaudeBot are exempted by default
-  when they come from their official ranges. Before 4.0 they were exempted only
-  if they were also listed in `allowed_bots`.
+  when they come from their official ranges. With
+  `BLOCK_BOTS_USE_DEFAULT_ALLOWED_BOTS=false`, these exemptions still require a
+  match in the middleware's custom bot list.
 - **Bot IP feeds are configured only in `bot_ip_provider.bots`.** The package no
   longer ships hardcoded feed URLs or bundled range snapshots. By default, each
   bot is listed with its URL only, so it is **not exempted until its first
