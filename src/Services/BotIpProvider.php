@@ -11,19 +11,9 @@ class BotIpProvider
 {
     public function sources(): array
     {
-        $defaults = require __DIR__ . '/bot-ip-defaults.php';
         $sources = [];
-        foreach ([
-            'gptbot' => 'https://openai.com/gptbot.json',
-            'chatgpt-user' => 'https://openai.com/chatgpt-user.json',
-            'oai-searchbot' => 'https://openai.com/searchbot.json',
-            'duckassistbot' => 'https://duckduckgo.com/duckassistbot.json',
-        ] as $bot => $url) {
-            $sources[$bot] = ['url' => $url, 'defaults' => $defaults[$bot]];
-        }
         foreach (config('block-bots.bot_ip_provider.bots', []) as $bot => $source) {
-            $bot = strtolower($bot);
-            $sources[$bot] = array_merge($sources[$bot] ?? ['defaults' => []], $source);
+            $sources[strtolower($bot)] = array_merge(['defaults' => []], (array) $source);
         }
         return $sources;
     }

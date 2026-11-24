@@ -27,7 +27,10 @@ class BotIpProviderTest extends TestCase
     {
         parent::setUp();
         Queue::fake();
-        config(['block-bots.log' => false]);
+        config([
+            'block-bots.log' => false,
+            'block-bots.bot_ip_provider.bots.gptbot.defaults' => ['132.196.86.0/24'],
+        ]);
     }
 
     private function feed(array $ranges): string
@@ -67,6 +70,31 @@ class BotIpProviderTest extends TestCase
             $this->assertSame([], (new BotIpResolver())->match('GPTBot/1.0'));
             $this->assertFalse($this->allowed('132.196.86.1'));
         }
+    }
+
+    public function test_configured_defaults_cover_only_the_window_before_the_first_refresh()
+    {
+        $provider = new BotIpProvider();
+        config(['block-bots.bot_ip_provider.bots.gptbot' => ['url' => 'https://openai.com/gptbot.json']]);
+        $this->assertTrue((new BotIpResolver())->manages('GPTBot'));
+        $this->assertSame([], $provider->ranges('gptbot'));
+        $this->assertFalse($this->allowed('132.196.86.1'));
+
+        config(['block-bots.bot_ip_provider.bots.gptbot.defaults' => ['132.196.86.0/24']]);
+        $this->assertTrue($this->allowed('132.196.86.1'));
+
+        $this->http([new Response(200, [], $this->feed(['198.51.100.0/24']))]);
+        $provider->queueRefresh('gptbot');
+        (new RefreshBotIpRanges('gptbot', Redis::get($provider->key('gptbot') . ':lock')))->handle($provider);
+        $this->assertFalse($this->allowed('132.196.86.1'));
+        $this->assertTrue($this->allowed('198.51.100.1'));
+    }
+
+    public function test_removing_a_bot_from_config_stops_managing_it()
+    {
+        config(['block-bots.bot_ip_provider.bots' => []]);
+        $this->assertSame([], (new BotIpProvider())->sources());
+        $this->assertFalse((new BotIpResolver())->manages('GPTBot'));
     }
 
     public function test_refresh_replaces_defaults_and_ignores_old_verification_sets()

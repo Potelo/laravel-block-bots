@@ -157,15 +157,21 @@ The default configuration includes a runtime provider alongside static ranges:
 ],
 ```
 
-`BotIpProvider` includes GPTBot, ChatGPT-User, OAI-SearchBot and DuckAssistBot.
-Its built-in snapshots are used until each feed is fetched successfully. Successful
-feeds replace the defaults entirely; later failures preserve the last successful
-snapshot indefinitely. Refreshes write only to Redis, never to tracked files.
+`BotIpProvider` manages only the bots listed in `bot_ip_provider.bots`. The default
+configuration lists GPTBot, ChatGPT-User, OAI-SearchBot and DuckAssistBot with their
+feed URLs only; remove an entry to stop managing that bot, or remove the provider
+from `allowed_bots_by_ip` to disable the feature entirely.
+
+Before a bot's first successful refresh, its optional `defaults` are used. A bot
+without `defaults` has no ranges until then, so it is **not exempted** (it is
+treated as any other client over the limit) until the scheduler and a queue worker
+fetch its feed. Successful feeds replace the defaults entirely; later failures
+preserve the last successful snapshot indefinitely. Refreshes write only to Redis, never to tracked files.
 Static bot arrays always override provider results, regardless of their order.
 Only an explicitly configured empty static array disables an exemption; empty
 remote feeds are errors. IP-managed bots do not need an `allowed_bots` entry.
 
-Optional configuration (URLs and defaults can be overridden or new bots added):
+Configuration (add, remove or edit bots; `defaults` is optional):
 
 ```php
 'bot_ip_provider' => [
@@ -173,6 +179,10 @@ Optional configuration (URLs and defaults can be overridden or new bots added):
     'refresh_days' => 15,
     'redis_prefix' => 'block_bot:ip_sources:',
     'bots' => [
+        'gptbot' => ['url' => 'https://openai.com/gptbot.json'],
+        'chatgpt-user' => ['url' => 'https://openai.com/chatgpt-user.json'],
+        'oai-searchbot' => ['url' => 'https://openai.com/searchbot.json'],
+        'duckassistbot' => ['url' => 'https://duckduckgo.com/duckassistbot.json'],
         'mybot' => [
             'url' => 'https://example.com/bot.json',
             'defaults' => ['192.0.2.0/24'],
@@ -187,7 +197,8 @@ Only HTTPS endpoints are supported; redirects are rejected. Use trusted URLs.
 The service class name and settings remain safe for `config:cache`; live ranges
 are read from Redis at runtime.
 
-The package automatically registers a daily scheduler check. Run Laravel's
+The package automatically registers a daily scheduler check. To avoid waiting for
+it after a deploy, run `php artisan block-bots:refresh-ips --due`. Run Laravel's
 scheduler and **an asynchronous queue worker** in the consuming application.
 Each source becomes due 15 days after its last successful fetch; new sources are
 due immediately. Failed sources retry five additional times, after 1 minute,
@@ -231,11 +242,15 @@ request. Old shared entries retain their existing behavior for other traffic.
 This also applies to static IP rules, including explicit empty overrides.
 
 If the application already published `config/block-bots.php`, replace the four
-moved static bot entries with `BotIpProvider::class` to enable dynamic updates.
+moved static bot entries with `BotIpProvider::class` and copy the `bot_ip_provider`
+block (including its `bots` list) to enable dynamic updates. Laravel merges only
+top-level config keys, so a published `bot_ip_provider` block without a `bots` list
+manages no bots.
+To keep the previous static ranges until the first refresh, set them as `defaults`.
 Leaving a static entry in the published configuration intentionally overrides that
 bot's provider ranges. Restart long-running queue workers after deployment.
 
 If upgrading from a version of the provider that used untagged Redis keys,
 run `php artisan block-bots:refresh-ips` after restarting the workers. Refreshes
-populate the new keys. Built-in or configured defaults apply until each refresh
+populate the new keys. Configured defaults, if any, apply until each refresh
 succeeds.

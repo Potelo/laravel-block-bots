@@ -125,8 +125,19 @@ return [
         'schedule_enabled' => true,
         'refresh_days' => 15,
         'redis_prefix' => 'block_bot:ip_sources:',
-        // Optional per-bot overrides: ['url' => 'https://...', 'defaults' => [...]].
-        'bots' => [],
+        /*
+         * Bots whose IP ranges are fetched from an official JSON feed.
+         * Format: 'user-agent keyword' => ['url' => 'https://...', 'defaults' => [...]].
+         * 'defaults' (optional) are CIDRs used until the first successful refresh;
+         * without them the bot is not exempted until its feed is fetched.
+         * Remove an entry to stop managing that bot.
+         */
+        'bots' => [
+            'gptbot' => ['url' => 'https://openai.com/gptbot.json'],
+            'chatgpt-user' => ['url' => 'https://openai.com/chatgpt-user.json'],
+            'oai-searchbot' => ['url' => 'https://openai.com/searchbot.json'],
+            'duckassistbot' => ['url' => 'https://duckduckgo.com/duckassistbot.json'],
+        ],
     ],
 
     /*
