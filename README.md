@@ -147,6 +147,10 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ### Dynamic bot IP ranges
 
+> **Breaking change in 4.0:** IP-managed bots are verified only by IP and their feeds
+> are configured only in `bot_ip_provider.bots`. See [CHANGELOG](CHANGELOG.md) before
+> upgrading from 3.x.
+
 The default configuration includes a runtime provider alongside static ranges:
 
 ```php
