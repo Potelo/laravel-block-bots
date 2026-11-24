@@ -28,7 +28,7 @@ class BotIpResolver
     {
         $rules = [];
         foreach ($this->providers() as $provider) {
-            foreach ($provider->sources() as $bot => $source) {
+            foreach (array_keys($provider->sources()) as $bot) {
                 $rules[$bot] = $provider;
             }
         }
