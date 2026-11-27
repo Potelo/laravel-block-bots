@@ -144,3 +144,119 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 [link-downloads]: https://packagist.org/packages/potelo/laravel-block-bots
 [link-author]: https://github.com/potelo
 
+
+### Dynamic bot IP ranges
+
+> **Breaking change in 4.0:** IP-managed bots are verified only by IP and their feeds
+> are configured only in `bot_ip_provider.bots`. See [CHANGELOG](CHANGELOG.md) before
+> upgrading from 3.x.
+
+The default configuration includes a runtime provider alongside static ranges:
+
+```php
+'allowed_bots_by_ip' => [
+    \Potelo\LaravelBlockBots\Services\BotIpProvider::class,
+    'claudebot' => ['160.79.104.0/21'],
+    // 'gptbot' => [], // Explicitly disable this bot's exemption.
+],
+```
+
+`BotIpProvider` manages only the bots listed in `bot_ip_provider.bots`. The default
+configuration lists GPTBot, ChatGPT-User, OAI-SearchBot and DuckAssistBot with their
+feed URLs only; remove an entry to stop managing that bot, or remove the provider
+from `allowed_bots_by_ip` to disable the feature entirely.
+
+Before a bot's first successful refresh, its optional `defaults` are used. A bot
+without `defaults` has no ranges until then, so it is **not exempted** (it is
+treated as any other client over the limit) until the scheduler and a queue worker
+fetch its feed. Successful feeds replace the defaults entirely; later failures
+preserve the last successful snapshot indefinitely. Refreshes write only to Redis, never to tracked files.
+Static bot arrays always override provider results, regardless of their order.
+Only an explicitly configured empty static array disables an exemption; empty
+remote feeds are errors. With `BLOCK_BOTS_USE_DEFAULT_ALLOWED_BOTS=false`,
+an IP-managed bot must also match the middleware's custom bot list to receive a bot
+exemption. Explicit `whitelist_ips` still apply.
+
+Configuration (add, remove or edit bots; `defaults` is optional):
+
+```php
+'bot_ip_provider' => [
+    'schedule_enabled' => true,
+    'refresh_days' => 15,
+    'redis_prefix' => 'block_bot:ip_sources:',
+    'bots' => [
+        'gptbot' => ['url' => 'https://openai.com/gptbot.json'],
+        'chatgpt-user' => ['url' => 'https://openai.com/chatgpt-user.json'],
+        'oai-searchbot' => ['url' => 'https://openai.com/searchbot.json'],
+        'duckassistbot' => ['url' => 'https://duckduckgo.com/duckassistbot.json'],
+        'mybot' => [
+            'url' => 'https://example.com/bot.json',
+            'defaults' => ['192.0.2.0/24'],
+        ],
+    ],
+],
+```
+
+Feeds must return HTTP 200 and JSON with nonempty `prefixes`, containing valid
+`ipv4Prefix` and/or `ipv6Prefix` CIDRs. Invalid entries reject the entire response.
+Only HTTPS endpoints are supported; redirects are rejected. Use trusted URLs.
+The service class name and settings remain safe for `config:cache`; live ranges
+are read from Redis at runtime.
+
+The package automatically registers a daily scheduler check. To avoid waiting for
+it after a deploy, run `php artisan block-bots:refresh-ips --due`. Run Laravel's
+scheduler and **an asynchronous queue worker** in the consuming application.
+Each source becomes due 15 days after its last successful fetch; new sources are
+due immediately. Failed sources retry five additional times, after 1 minute,
+5 minutes, 30 minutes, 2 hours and 12 hours. After exhaustion the next daily check
+starts a new cycle. A Redis lease prevents duplicate cycles across servers;
+abandoned cycles become eligible again after its two-day expiry. Use a queue
+backend that supports 12-hour delays (for example Redis or database, not SQS).
+
+```bash
+# Queue immediate refreshes, including recently updated sources:
+php artisan block-bots:refresh-ips
+
+# Queue only new or due sources (also invoked by the scheduler):
+php artisan block-bots:refresh-ips --due
+```
+
+When changing a bot's feed URL, rebuild the configuration cache if the
+application uses one, restart the queue workers, and run
+`php artisan block-bots:refresh-ips` without `--due`. This queues a refresh for
+each configured source without an active lease, including sources with recent
+snapshots. If a source already has an active lease, its existing cycle can fetch
+the new URL once the restarted worker picks up the job. If you still need to
+force a refresh, run the command again after the lease is released or expires.
+The bot keeps using its previous snapshot until a worker successfully fetches
+the new feed.
+
+#### Verification behavior and upgrade notes
+
+Normal guest rules and rate limits still run first. When the bot exemption is
+needed, IP rules use the **original IP**, not the normalized IPv6 prefix, and run
+before the shared whitelist/fake-bot sets. IP-managed bots are no longer admitted
+while awaiting asynchronous DNS checks, nor do they populate permanent verification
+sets. Existing queued DNS jobs for these bots exit without writing results.
+
+Explicit `whitelist_ips` entries still grant access for IP-managed bots.
+Previously cached whitelist/fake-bot decisions are ignored for IP-managed requests;
+no blanket deletion of shared Redis sets is performed because those sets do not
+record which bot created each entry. Consequently, a removed range immediately
+loses its bot exemption and a newly added range can be reconsidered on the next
+request. Old shared entries retain their existing behavior for other traffic.
+This also applies to static IP rules, including explicit empty overrides.
+
+If the application already published `config/block-bots.php`, replace the four
+moved static bot entries with `BotIpProvider::class` and copy the `bot_ip_provider`
+block (including its `bots` list) to enable dynamic updates. Laravel merges only
+top-level config keys, so a published `bot_ip_provider` block without a `bots` list
+manages no bots.
+To keep the previous static ranges until the first refresh, set them as `defaults`.
+Leaving a static entry in the published configuration intentionally overrides that
+bot's provider ranges. Restart long-running queue workers after deployment.
+
+If upgrading from a version of the provider that used untagged Redis keys,
+run `php artisan block-bots:refresh-ips` after restarting the workers. Refreshes
+populate the new keys. Configured defaults, if any, apply until each refresh
+succeeds.
