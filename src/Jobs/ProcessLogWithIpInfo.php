@@ -46,7 +46,8 @@ class ProcessLogWithIpInfo implements ShouldQueue
     public function handle()
     {
         $hits = Redis::get($this->client->key);
-        $host = strtolower(gethostbyaddr($this->client->ip));
+        $ip = filter_var($this->client->ip, FILTER_VALIDATE_IP);
+        $host = $ip ? strtolower((string) gethostbyaddr($ip)) : '';
 
         if (!empty($this->accessLimit)) {
             $message = "[Block-Bots] IP: {$this->client->ip}; After {$hits}/{$this->accessLimit} requests, Host: {$host} \n  with User agent: {$this->client->userAgent};  was {$this->action}";
@@ -54,14 +55,15 @@ class ProcessLogWithIpInfo implements ShouldQueue
             $message = "[Block-Bots] IP: {$this->client->ip}; After {$hits} requests, Host: {$host} \n  with User agent: {$this->client->userAgent};  was {$this->action}";
         }
 
-        if ($this->options->ip_info_key) {
+        if ($ip && $this->options->ip_info_key) {
             $http = new HTTP();
             $response = $http->get(
-                "http://ipinfo.io/{$this->client->ip}",
+                "https://ipinfo.io/{$ip}/json",
                 [
-                    'query' => [
-                        'token' => $this->options->ip_info_key,
-                    ]
+                    'headers' => ['Authorization' => 'Bearer ' . $this->options->ip_info_key],
+                    'allow_redirects' => false,
+                    'connect_timeout' => 1,
+                    'timeout' => 2,
                 ]
             );
 

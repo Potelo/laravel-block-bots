@@ -3,6 +3,8 @@
 namespace Potelo\LaravelBlockBots\Middleware;
 
 use Closure;
+use Potelo\LaravelBlockBots\Services\GuestPageQuota;
+use Potelo\LaravelBlockBots\Services\GuestQuotaExemptions;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redis;
@@ -15,6 +17,7 @@ use Potelo\LaravelBlockBots\Events\BotBlockedEvent;
 
 class BlockBots extends AbstractBlockBots
 {
+    private $verifiedSearchCrawler;
 
     /**
      * Executes the middleware
@@ -27,6 +30,8 @@ class BlockBots extends AbstractBlockBots
      */
     public function handle($request, Closure $next, $limit = 100, $frequency = 'daily')
     {
+        $this->verifiedSearchCrawler = null;
+        $this->incrementHits = true;
         $this->setUp($request, $limit, $frequency);
         $this->beforeHandle();
 
@@ -34,9 +39,81 @@ class BlockBots extends AbstractBlockBots
             return $next($request);
         }
 
+        if ($this->options->mode !== 'always' && Auth::guest() && ($limits = $this->guestQuotaLimits()) !== null) {
+            if ($this->options->mode === 'never') {
+                return $next($request);
+            }
+            if (GuestQuotaExemptions::allows($this->client, $this->options, $this->getAllowedBots())
+                && (!method_exists($this, 'botRules') || $this->botRules())) {
+                return $next($request);
+            }
+            $refusal = GuestPageQuota::admit($this->client->ip, $limits, $this->guestQuotaPageKey(), $this->options->timezone);
+            return $refusal === null ? $next($request) : $this->guestQuotaExceeded($refusal);
+        }
+
         $this->hits = $this->client->countHits($this->incrementHits, $frequency);
 
         return $this->isAllowed() ? $next($request) : $this->notAllowed();
+    }
+
+    /**
+     * Opt in per route to daily [client, network] quotas for anonymous visits.
+     * The default retains the application's existing rules and frequency.
+     */
+    protected function guestQuotaLimits()
+    {
+        return null;
+    }
+
+    /** Return a stable page ID when several requests render one public page. */
+    protected function guestQuotaPageKey()
+    {
+        return null;
+    }
+
+    /** A manual IP exemption alone does not identify a search crawler. */
+    public function isVerifiedSearchCrawler()
+    {
+        if ($this->verifiedSearchCrawler === null) {
+            $this->verifiedSearchCrawler = $this->client !== null && GuestQuotaExemptions::isVerifiedSearchCrawler(
+                $this->client, $this->options, $this->getAllowedBots()
+            );
+        }
+        return $this->verifiedSearchCrawler;
+    }
+
+    private function guestQuotaExceeded(array $refusal)
+    {
+        if ($refusal['first']) {
+            $this->client->key = $refusal['key'];
+            if ($this->options->log) {
+                try {
+                    $driver = config('queue.connections.' . config('queue.default') . '.driver');
+                    if ($driver === 'sync' || $driver === null) {
+                        // No DNS or HTTP enrichment on the request worker.
+                        error_log('[Block-Bots] Daily guest quota reached (' . $refusal['limit'] . ').');
+                    } else {
+                        ProcessLogWithIpInfo::dispatch($this->client, 'BLOCKED', $this->options, $refusal['limit']);
+                    }
+                } catch (\Throwable $error) {
+                    error_log('[Block-Bots] Unable to queue guest quota log: ' . get_class($error));
+                }
+            }
+            try {
+                event(new BotBlockedEvent($this->client->ip, $refusal['limit'] + 1, Carbon::now()));
+            } catch (\Throwable $error) {
+                error_log('[Block-Bots] Unable to notify guest quota listener: ' . get_class($error));
+            }
+        }
+        $headers = [
+            'Retry-After' => $refusal['ttl'],
+            'Cache-Control' => 'private, no-store',
+            'X-BlockBots-Reason' => 'guest-page-quota',
+        ];
+        if ($this->request->expectsJson()) {
+            return response()->json($this->options->json_response, 429, $headers);
+        }
+        return response(view('block-bots::error', ['guestPageQuota' => true]), 429, $headers);
     }
 
     /**
