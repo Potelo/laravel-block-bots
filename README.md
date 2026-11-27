@@ -14,7 +14,7 @@ Laravel Block bots is a package that blocks bad crawlers, people trying to scrap
 - Verify Crawlers using reverse DNS
 - Highly configurable
 - Redirect users to a page when they got blocked
-- Allow Logged users to always bypass blocks
+- Apply configurable limits to authenticated users
 - **Native IPv6 support** with prefix-based rate limiting
 
 ## Install
@@ -119,7 +119,9 @@ The package also handles legitimate bots (like GoogleBot) that use IPv6:
 - Trackable prefix is used for whitelisting
 - Once verified, all IPs within the bot's prefix are automatically allowed
 
-This ensures legitimate crawlers are never blocked while still rate limiting potential abusers.
+Forward DNS must contain the exact original IPv6 address (AAAA record); another
+address in the same prefix is insufficient. A failed verification removes the
+unlimited bot exemption; normal rate limits still apply.
 
 ## Change log
 
@@ -260,3 +262,44 @@ If upgrading from a version of the provider that used untagged Redis keys,
 run `php artisan block-bots:refresh-ips` after restarting the workers. Refreshes
 populate the new keys. Configured defaults, if any, apply until each refresh
 succeeds.
+
+### Rate-limit responses
+
+Unknown bots and bots that fail verification retain the normal request limit.
+Requests denied above that limit receive **429** with `Retry-After` in seconds,
+read from the actual hit counter's Redis TTL. This includes authenticated users.
+The header is omitted when there is no positive TTL. Custom rule denials and
+`mode=always` retain 429; they only get this header when the limit is exceeded.
+
+The existing `json_response` and HTML view remain unchanged. Applications
+overriding `notAllowed()` must add the header to their custom responses.
+
+### DNS verification upgrade and deployment
+
+Configured hostname values containing a dot must match the whole PTR hostname
+or a subdomain suffix: `msn.com` accepts `crawler.search.msn.com`, but rejects
+`msn.com.attacker.test`. Values without dots retain substring matching and its
+limitations; `*` retains its existing behavior. The default `msn` entry now uses
+`msn.com`. IPv4 retains exact forward-address matching; IPv6 now requires an
+exact AAAA address, comparing binary addresses to handle equivalent spellings.
+DNS lookup errors propagate without adding the address to the fake-bot set;
+the pending entry has been removed so a later request can enqueue another check.
+
+**Clear the existing whitelist after deploying the stricter verifier.** Otherwise
+entries approved by the old rules keep their exemption. Before clearing,
+evaluate the number of entries (`SCARD` on the configured whitelist key), active
+bot traffic, queue backlog, worker capacity, and DNS latency. Expect a temporary
+increase in reverse and forward DNS lookups as active bots are reverified.
+Use an asynchronous queue and choose a lower-traffic deployment window.
+
+1. Update published configuration, especially `allowed_bots.msn` to `msn.com`.
+2. Rebuild configuration caches and restart queue workers on the new code.
+   Ensure old-version workers cannot repopulate the whitelist.
+3. Run `php artisan block-bots:clear-whitelist`.
+4. Monitor verification volume, queue latency/failures, DNS errors and 429 rates.
+
+The default middleware admits recognized DNS bots while verification is pending.
+Applications requiring completed verification may temporarily return 429 to
+legitimate crawlers until their jobs finish. Static whitelist IPs are restored
+on evaluation; IP-range exemptions do not depend on this whitelist.
+The package does not clear production data automatically.
