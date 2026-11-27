@@ -13,6 +13,12 @@ return [
 
     'use_default_allowed_bots' => env('BLOCK_BOTS_USE_DEFAULT_ALLOWED_BOTS', true),
 
+    // Full PTR suffixes for the opt-in guest quota. A forward lookup must also match the exact IP.
+    'guest_quota_dns_domains' => [
+        'googlebot' => ['googlebot.com', 'google.com'],
+        'bingbot' => ['search.msn.com'],
+        'applebot' => ['applebot.apple.com'],
+    ],
     // 'block_when_crash' => env('BLOCK_BOTS_BLOCK_WHEN_CRASH', true),
 
 

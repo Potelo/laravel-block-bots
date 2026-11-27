@@ -2,7 +2,13 @@
 
 All notable changes to `laravel-block-bots` are documented in this file.
 
-## 4.0 - Unreleased
+## 4.1.0
+
+- Add opt-in daily guest quotas for both the client and its network, with atomic
+  admission, page deduplication and a distinct 429 response for the login prompt.
+- Verify search crawler identity separately from IP exemptions on protected pages.
+
+## 4.0 changes included in 4.1.0
 
 ### ⚠️ Breaking changes
 

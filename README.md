@@ -303,3 +303,22 @@ Applications requiring completed verification may temporarily return 429 to
 legitimate crawlers until their jobs finish. Static whitelist IPs are restored
 on evaluation; IP-range exemptions do not depend on this whitelist.
 The package does not clear production data automatically.
+
+## Daily guest quotas for public pages
+
+Override the route middleware's `guestQuotaLimits()` to return `[20, 100]` on the protected pages.
+The first limit applies to an IPv4 address or IPv6 /64. The second applies to the encompassing
+IPv4 /24 or IPv6 /48. Returning `null` keeps the original policy. Authenticated users follow
+the application's usual account rules. Use the framework's trusted-proxy configuration and
+resolve the authentication guard before selecting the client identity.
+
+Both counters expire at midnight in the configured timezone. A single atomic Redis call admits a
+visit or returns the exhausted limit. A rejected visit does not spend the other counter's budget.
+For multiple requests representing the same page, return its server-resolved identity from
+`guestQuotaPageKey()`. Only admitted pages are deduplicated, for up to five minutes per client.
+
+A guest quota refusal returns HTTP 429, `Retry-After`, `Cache-Control: private, no-store` and
+`X-BlockBots-Reason: guest-page-quota`. Override `block-bots::error` to offer a login link.
+The view receives `$guestPageQuota = true`. AJAX requests retain the configured JSON representation.
+Use `isVerifiedSearchCrawler()` for a verified Googlebot or Bingbot identity. An operational IP
+exemption permits access but does not identify a search engine.
