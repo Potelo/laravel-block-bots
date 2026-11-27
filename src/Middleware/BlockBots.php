@@ -60,11 +60,19 @@ class BlockBots extends AbstractBlockBots
             event(new BotBlockedEvent($this->client->ip, $this->hits, Carbon::now()));
         }
 
-        if ($this->request->expectsJson()) {
-            return response()->json($this->options->json_response, 429);
+        $headers = [];
+        if ($this->isLimitExceeded()) {
+            $ttl = (int) Redis::ttl($this->client->key);
+            if ($ttl > 0) {
+                $headers['Retry-After'] = $ttl;
+            }
         }
 
-        return response(view('block-bots::error'), 429);
+        if ($this->request->expectsJson()) {
+            return response()->json($this->options->json_response, 429, $headers);
+        }
+
+        return response(view('block-bots::error'), 429, $headers);
     }
 
     /**
@@ -95,6 +103,10 @@ class BlockBots extends AbstractBlockBots
     private function isAllowedBot()
     {
         $allowedBotsKeys = array_keys($this->getAllowedBots());
+        if ($allowedBotsKeys === []) {
+            return false;
+        }
+
         $userAgent = strtolower($this->client->userAgent);
         $pattern = strtolower('(' . implode('|', $allowedBotsKeys) . ')');
 
@@ -125,14 +137,7 @@ class BlockBots extends AbstractBlockBots
             return true;
         }
 
-        $ips = $this->options->whitelist_ips;
-
-        if (is_null($this->client->ip)) {
-            return false;
-        }
-
-        // Use original IP for CIDR matching (IpUtils handles both IPv4 and IPv6 CIDR)
-        if (IpUtils::checkIp($this->client->ip, $ips)) {
+        if ($this->isExplicitlyWhitelisted()) {
             // Add trackable IP to Redis whitelist for faster future checks
             Redis::sadd($this->options->whitelist_key, $this->client->trackableIp);
             if ($this->options->log) {
@@ -142,6 +147,12 @@ class BlockBots extends AbstractBlockBots
         }
 
         return false;
+    }
+
+    private function isExplicitlyWhitelisted(): bool
+    {
+        return $this->client->ip !== null
+            && IpUtils::checkIp($this->client->ip, $this->options->whitelist_ips);
     }
 
 
@@ -188,6 +199,17 @@ class BlockBots extends AbstractBlockBots
                 return false;
             }
         }
+        // IP rules are authoritative, including an explicit empty static array.
+        // Never reuse prefix-wide verification results for IP-managed bots.
+        $ranges = app(\Potelo\LaravelBlockBots\Services\BotIpResolver::class)
+            ->match((string) $this->client->userAgent);
+        if ($ranges !== null) {
+            return $this->isExplicitlyWhitelisted()
+                || (($this->options->use_default_allowed_bots || $this->isAllowedBot())
+                    && filter_var($this->client->ip, FILTER_VALIDATE_IP) !== false
+                    && \Potelo\LaravelBlockBots\Helpers\IpHelper::ipInAnyCidr($this->client->ip, $ranges));
+        }
+
         //We fast-track allowed IPs
         if ($this->isWhitelisted()) {
             return true;

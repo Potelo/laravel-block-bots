@@ -20,6 +20,7 @@ class BlockBotsServiceProvider extends ServiceProvider
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                \Potelo\LaravelBlockBots\Commands\RefreshBotIps::class,
                 ClearWhitelist::class,
                 ListWhitelist::class,
                 ListHits::class,
@@ -30,6 +31,12 @@ class BlockBotsServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/config/block-bots.php' => config_path('block-bots.php'),
         ], 'config');
+
+        $this->app->afterResolving(\Illuminate\Console\Scheduling\Schedule::class, function ($schedule) {
+            if (config('block-bots.bot_ip_provider.schedule_enabled', true)) {
+                $schedule->command('block-bots:refresh-ips --due')->daily();
+            }
+        });
 
         $this->loadViewsFrom(__DIR__ . '/views', 'block-bots');
 
