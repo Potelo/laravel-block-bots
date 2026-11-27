@@ -77,7 +77,7 @@ class IpHelper
         // Handle partial byte
         $remainingBits = $bitsToKeep % 8;
         if ($remainingBits > 0) {
-            $mask .= chr(0xff << (8 - $remainingBits));
+            $mask .= chr((0xff << (8 - $remainingBits)) & 0xff);
         }
         
         // Pad with zeros
