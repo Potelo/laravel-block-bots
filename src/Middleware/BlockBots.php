@@ -60,11 +60,19 @@ class BlockBots extends AbstractBlockBots
             event(new BotBlockedEvent($this->client->ip, $this->hits, Carbon::now()));
         }
 
-        if ($this->request->expectsJson()) {
-            return response()->json($this->options->json_response, 429);
+        $headers = [];
+        if ($this->isLimitExceeded()) {
+            $ttl = (int) Redis::ttl($this->client->key);
+            if ($ttl > 0) {
+                $headers['Retry-After'] = $ttl;
+            }
         }
 
-        return response(view('block-bots::error'), 429);
+        if ($this->request->expectsJson()) {
+            return response()->json($this->options->json_response, 429, $headers);
+        }
+
+        return response(view('block-bots::error'), 429, $headers);
     }
 
     /**
